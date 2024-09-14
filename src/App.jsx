@@ -42,7 +42,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="h-screen w-screen overflow-hidden">
+    <div className="h-screen w-screen overflow-hidden app-container">
       <NavBar ref={navBarRef} setDarkMode={setDarkMode} darkMode={darkMode} />
       <ToolBar navBarHeight={navBarHeight} />
       <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-950">
