@@ -2,7 +2,7 @@ import React from "react";
 
 export default function MenuModal({ onClose, onDarkModeToggle, isDarkMode }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 font-mono">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 relative w-96">
         {/* Header: Title and Close Icon */}
         <div className="flex justify-between items-center mb-4">

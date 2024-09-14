@@ -46,7 +46,7 @@ export default function App() {
       <NavBar ref={navBarRef} setDarkMode={setDarkMode} darkMode={darkMode} />
       <ToolBar navBarHeight={navBarHeight} />
       <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-950">
-        <h1 className="text-4xl font-bold text-blue-600 dark:text-white">
+        <h1 className="text-4xl font-bold text-blue-600 dark:text-gray-200 font-mono">
           Bonjour, Drawing-AI V2 !
         </h1>
       </div>

@@ -18,28 +18,34 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
 
   const menuRefs = useRef([]);
 
-  // Update underline position based on active tab
-  useEffect(() => {
+  // Function to update the underline position and width
+  const updateUnderline = () => {
     const currentIndex = menuItems.findIndex((item) => item.name === activeTab);
     if (menuRefs.current[currentIndex]) {
       setUnderlinePosition(menuRefs.current[currentIndex].offsetLeft);
       setUnderlineWidth(menuRefs.current[currentIndex].offsetWidth);
     }
-  }, [activeTab]);
+  };
+
+  // Update underline position based on active tab and window resize
+  useEffect(() => {
+    updateUnderline(); // Update underline when activeTab changes
+
+    // Add event listener for window resize
+    window.addEventListener("resize", updateUnderline);
+
+    // Cleanup event listener on component unmount
+    return () => {
+      window.removeEventListener("resize", updateUnderline);
+    };
+  }, [activeTab]); // Run this effect when activeTab changes
 
   return (
     <>
-      <nav
-        ref={ref} // Attach ref for dynamic height measurement
-        className="bg-white dark:bg-gray-900 shadow-md w-full"
-      >
-        <div className="relative max-w-full mx-auto px-0 sm:px-0 lg:px-0">
+      <nav ref={ref} className="bg-white dark:bg-gray-900 w-full">
+        <div className="relative max-w-full mx-auto px-0 sm:px-0 lg:px-0 shadow-md">
           <div className="flex justify-between mx-2 h-10 items-center">
-            {" "}
-            {/* Hauteur rétablie à 10 */}
-            {/* Logo */}
             <img src={`/logo192.png`} alt="logo" className="h-8 w-auto ml-2" />
-            {/* Menu Items */}
             <div className="flex flex-1 items-center h-full space-x-0 ml-4 relative">
               {menuItems.map((item, index) => (
                 <button
@@ -48,14 +54,25 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
                   onClick={() => setActiveTab(item.name)}
                   className={`${
                     activeTab === item.name
-                      ? "text-blue-600 dark:text-blue-400"
-                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  } h-full px-6 py-2 text-sm font-medium transition-all duration-300 ease-in-out`}
+                      ? "bg-blue-50 dark:bg-gray-800 text-blue-600 dark:text-blue-400 text-md font-semibold"
+                      : "text-gray-600 dark:text-gray-300 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                  } h-full px-6 py-2 font-mono font-medium transition-all duration-300 ease-in-out`}
                   style={{ flex: 1 }}
                 >
-                  {item.name}
+                  {/* If the item is "DEV. OPTIONS", show a different text for small screens */}
+                  {item.name === "DEV. OPTIONS" ? (
+                    <>
+                      <span className="block md:hidden">DEV.OPT</span>{" "}
+                      {/* Small screen text */}
+                      <span className="hidden md:block">{item.name}</span>{" "}
+                      {/* Large screen text */}
+                    </>
+                  ) : (
+                    item.name
+                  )}
                 </button>
               ))}
+
               {/* Animated underline */}
               <div
                 className="absolute bottom-0 h-1 bg-blue-500 dark:bg-blue-400 transition-all duration-300 ease-in-out"
@@ -65,7 +82,6 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
                 }}
               />
             </div>
-            {/* Settings Icon Button */}
             <div className="ml-4 mx-2">
               <button
                 className="w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center"
@@ -81,7 +97,6 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
         </div>
       </nav>
 
-      {/* Render the modal if open */}
       {isModalOpen && (
         <MenuModal
           onClose={() => setIsModalOpen(false)}
