@@ -34,8 +34,8 @@ export default function Tool({
         ref={buttonRef}
         className={`${
           activeTool === nameTool
-            ? "rounded-full bg-cyan-950 dark:bg-teal-300"
-            : "rounded-md bg-white border border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:bg-gray-900 dark:hover:bg-gray-700"
+            ? "rounded-full bg-gray-100 dark:bg-gray-800 border-4 border-cyan-500 "
+            : "rounded-md bg-white border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
         } p-1 flex items-center justify-center shadow-md dark:shadow-none
         transform transition-all hover:scale-110 duration-300 ease-in-out
         ${
@@ -53,7 +53,7 @@ export default function Tool({
           icon={iconTool}
           className={`${
             activeTool === nameTool
-              ? "text-teal-300 dark:text-cyan-950"
+              ? "text-cyan-900 dark:text-cyan-500"
               : "text-gray-700 dark:text-gray-200"
           }`}
           style={{ fontSize: iconSize * 0.5 }}

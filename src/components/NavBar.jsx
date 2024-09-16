@@ -50,7 +50,7 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
 
   return (
     <>
-      <nav ref={ref} className="bg-white dark:bg-gray-900 w-full ">
+      <nav ref={ref} className="bg-white dark:bg-gray-800 w-full ">
         <div className="relative max-w-full mx-auto px-0 sm:px-0 lg:px-0 shadow-md z-50">
           <div className="flex justify-between mx-2 h-10 items-center">
             <img src={`/logo192.png`} alt="logo" className="h-8 w-auto ml-2" />
@@ -62,7 +62,7 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
                   onClick={() => setActiveTab(item.name)}
                   className={`${
                     activeTab === item.name
-                      ? "bg-blue-50 dark:bg-gray-800 text-blue-600 dark:text-blue-400 text-xs md:text-base font-semibold"
+                      ? "bg-blue-50 dark:bg-gray-800 text-cyan-900 dark:text-cyan-500 text-xs md:text-base font-semibold"
                       : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs md:text-sm"
                   } h-full px-2 md:px-6 py-2 font-mono font-medium transition-all duration-300 ease-in-out `}
                   style={{ flex: 1 }}
@@ -83,7 +83,7 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
 
               {/* Animated underline */}
               <div
-                className="absolute bottom-0 h-1 bg-blue-500 dark:bg-blue-400 transition-all duration-300 ease-in-out"
+                className="absolute bottom-0 h-1 bg-cyan-500 dark:bg-cyan-500 transition-all duration-300 ease-in-out"
                 style={{
                   width: underlineWidth,
                   transform: `translateX(${underlinePosition}px)`,

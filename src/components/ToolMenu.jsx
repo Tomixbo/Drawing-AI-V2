@@ -67,17 +67,14 @@ export default function ToolMenu({ navBarHeight, hoverPosition }) {
       </div>
 
       <div
-        className={`transition-all duration-300 ease-in-out bg-white text-black dark:bg-cyan-950 dark:text-gray-300
+        className={`transition-all duration-300 ease-in-out bg-white text-black
         flex items-center justify-center shadow-md w-full h-full rounded-full z-10
       `}
         style={{
           cursor: "pointer",
         }}
       >
-        <FontAwesomeIcon
-          icon={faSliders}
-          className="text-gray-600 dark:text-gray-300 text-lg"
-        />
+        <FontAwesomeIcon icon={faSliders} className="text-gray-600 text-lg" />
       </div>
     </div>
   );
