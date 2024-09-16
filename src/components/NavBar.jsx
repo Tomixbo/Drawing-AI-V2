@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCog } from "@fortawesome/free-solid-svg-icons";
+import { faGear } from "@fortawesome/free-solid-svg-icons";
 import MenuModal from "./MenuModal";
 
 const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
@@ -27,6 +27,14 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
     }
   };
 
+  // Initial update of the underline on mount
+  useEffect(() => {
+    // Delay the updateUnderline to ensure refs are populated
+    setTimeout(() => {
+      updateUnderline();
+    }, 0);
+  }, []); // Run this effect only once on mount
+
   // Update underline position based on active tab and window resize
   useEffect(() => {
     updateUnderline(); // Update underline when activeTab changes
@@ -42,11 +50,11 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
 
   return (
     <>
-      <nav ref={ref} className="bg-white dark:bg-gray-900 w-full">
-        <div className="relative max-w-full mx-auto px-0 sm:px-0 lg:px-0 shadow-md">
+      <nav ref={ref} className="bg-white dark:bg-gray-900 w-full ">
+        <div className="relative max-w-full mx-auto px-0 sm:px-0 lg:px-0 shadow-md z-50">
           <div className="flex justify-between mx-2 h-10 items-center">
             <img src={`/logo192.png`} alt="logo" className="h-8 w-auto ml-2" />
-            <div className="flex flex-1 items-center h-full space-x-0 ml-4 relative">
+            <div className="flex flex-1 items-center h-full space-x-0 ml-4 relative ">
               {menuItems.map((item, index) => (
                 <button
                   key={item.name}
@@ -54,9 +62,9 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
                   onClick={() => setActiveTab(item.name)}
                   className={`${
                     activeTab === item.name
-                      ? "bg-blue-50 dark:bg-gray-800 text-blue-600 dark:text-blue-400 text-md font-semibold"
-                      : "text-gray-600 dark:text-gray-300 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-                  } h-full px-6 py-2 font-mono font-medium transition-all duration-300 ease-in-out`}
+                      ? "bg-blue-50 dark:bg-gray-800 text-blue-600 dark:text-blue-400 text-xs md:text-base font-semibold"
+                      : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs md:text-sm"
+                  } h-full px-2 md:px-6 py-2 font-mono font-medium transition-all duration-300 ease-in-out `}
                   style={{ flex: 1 }}
                 >
                   {/* If the item is "DEV. OPTIONS", show a different text for small screens */}
@@ -88,7 +96,7 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
                 onClick={() => setIsModalOpen(true)}
               >
                 <FontAwesomeIcon
-                  icon={faCog}
+                  icon={faGear}
                   className="text-gray-600 dark:text-gray-300 text-lg"
                 />
               </button>
