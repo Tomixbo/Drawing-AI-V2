@@ -6,14 +6,14 @@ import {
   faPaintBrush,
   faFillDrip,
   faImage,
+  faArrowsUpDownLeftRight,
 } from "@fortawesome/free-solid-svg-icons";
 
-export default function ToolBar({ navBarHeight }) {
+export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
   const isDragging = useRef(false);
   const [isTransparent, setIsTransparent] = useState(false);
   const [hoverPosition, setHoverPosition] = useState("left");
   const toolbarRef = useRef(null);
-  const [activeTool, setActiveTool] = useState("Brush");
   const toolSize = 60;
 
   const disableTextSelection = () => {
@@ -116,13 +116,18 @@ export default function ToolBar({ navBarHeight }) {
   };
 
   // Function to activate the eraser tool
-  const handleEraser = () => {
-    setActiveTool("Eraser");
+  const handlePan = () => {
+    setActiveTool("Pan");
   };
 
   // Function to activate the brush tool
   const handleBrush = () => {
     setActiveTool("Brush");
+  };
+
+  // Function to activate the eraser tool
+  const handleEraser = () => {
+    setActiveTool("Eraser");
   };
 
   // Function to activate the fill tool
@@ -210,6 +215,15 @@ export default function ToolBar({ navBarHeight }) {
               : "flex-col "
           }`}
         >
+          <Tool
+            iconTool={faArrowsUpDownLeftRight}
+            nameTool={"Pan"}
+            iconSize={toolSize}
+            activeTool={activeTool}
+            hoverPosition={hoverPosition}
+            handleFunction={handlePan}
+            navBarHeight={navBarHeight}
+          />
           <Tool
             iconTool={faPaintBrush}
             nameTool={"Brush"}

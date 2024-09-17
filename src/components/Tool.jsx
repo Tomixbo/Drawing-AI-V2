@@ -34,10 +34,10 @@ export default function Tool({
         ref={buttonRef}
         className={`${
           activeTool === nameTool
-            ? "rounded-full bg-gray-100 dark:bg-gray-800 border-4 border-cyan-500 "
-            : "rounded-md bg-white border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
+            ? "transition-all rounded-full bg-gray-100 dark:bg-gray-800 border-4 border-cyan-500 "
+            : "transition-transform rounded-md bg-white border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700"
         } p-1 flex items-center justify-center shadow-md dark:shadow-none
-        transform transition-all hover:scale-110 duration-300 ease-in-out
+        transform  hover:scale-110 duration-300 ease-in-out
         ${
           hoverPosition === "top" || hoverPosition === "bottom"
             ? "mx-0.5 hover:mx-3"

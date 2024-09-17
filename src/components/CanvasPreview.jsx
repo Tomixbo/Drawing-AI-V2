@@ -1,12 +1,14 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 
-export default function CanvasPreview() {
+export default function CanvasPreview({ activeTool }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
   const [context, setContext] = useState(null);
   const [scale, setScale] = useState(1); // Zoom scale
   const [lines, setLines] = useState([]); // Store drawn lines
   const [origin, setOrigin] = useState({ x: 0, y: 0 }); // Origin for zoom
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 }); // Start position for panning
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -22,38 +24,70 @@ export default function CanvasPreview() {
     y: y / scale + origin.y,
   });
 
-  // Start drawing
-  const startDrawing = useCallback(
+  // Start drawing or pan
+  const handleMouseDown = useCallback(
     (e) => {
-      setIsDrawing(true);
-      const { offsetX, offsetY } = e.nativeEvent;
-      const point = canvasToWorld(offsetX, offsetY, scale, origin);
-      setLines((prevLines) => [...prevLines, [point]]);
+      if (activeTool === "Pan" && e.button === 0) {
+        // Left mouse button for panning
+        setIsPanning(true);
+        setPanStart({ x: e.clientX, y: e.clientY });
+      } else if (activeTool === "Brush" && e.button === 0) {
+        // Left mouse button for drawing
+        setIsDrawing(true);
+        const { offsetX, offsetY } = e.nativeEvent;
+        const point = canvasToWorld(offsetX, offsetY, scale, origin);
+        setLines((prevLines) => [...prevLines, [point]]);
+      }
+      // Middle mouse button for panning
+      if (e.button === 1) {
+        setIsPanning(true);
+        setPanStart({ x: e.clientX, y: e.clientY });
+      }
     },
-    [scale, origin]
+    [scale, origin, activeTool]
+  );
+
+  // Handle panning
+  const handlePan = useCallback(
+    (e) => {
+      if (!isPanning) return;
+      const dx = (e.clientX - panStart.x) / scale;
+      const dy = (e.clientY - panStart.y) / scale;
+
+      setOrigin((prevOrigin) => ({
+        x: prevOrigin.x - dx,
+        y: prevOrigin.y - dy,
+      }));
+      setPanStart({ x: e.clientX, y: e.clientY });
+    },
+    [isPanning, panStart, scale]
   );
 
   // Draw while mouse is moving
-  const draw = useCallback(
+  const handleMouseMove = useCallback(
     (e) => {
-      if (!isDrawing) return;
-      const { offsetX, offsetY } = e.nativeEvent;
-      const point = canvasToWorld(offsetX, offsetY, scale, origin);
-      setLines((prevLines) => {
-        const newLines = [...prevLines];
-        newLines[newLines.length - 1] = [
-          ...newLines[newLines.length - 1],
-          point,
-        ];
-        return newLines;
-      });
+      if (isDrawing) {
+        const { offsetX, offsetY } = e.nativeEvent;
+        const point = canvasToWorld(offsetX, offsetY, scale, origin);
+        setLines((prevLines) => {
+          const newLines = [...prevLines];
+          newLines[newLines.length - 1] = [
+            ...newLines[newLines.length - 1],
+            point,
+          ];
+          return newLines;
+        });
+      } else if (isPanning) {
+        handlePan(e);
+      }
     },
-    [isDrawing, scale, origin]
+    [isDrawing, scale, origin, isPanning, handlePan]
   );
 
-  // Stop drawing
-  const stopDrawing = useCallback(() => {
+  // Stop drawing or panning
+  const handleMouseUp = useCallback(() => {
     setIsDrawing(false);
+    setIsPanning(false);
   }, []);
 
   // Redraw all lines
@@ -96,7 +130,7 @@ export default function CanvasPreview() {
   // Handle zoom using keyboard shortcuts (zoom from the center)
   const zoomFromCenter = useCallback(
     (e) => {
-      if (e.altKey) {
+      if (e.ctrlKey) {
         const canvas = canvasRef.current;
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
@@ -145,6 +179,43 @@ export default function CanvasPreview() {
     [scale, origin]
   );
 
+  // Handle zoom with slider
+  const handleSliderChange = useCallback(
+    (e) => {
+      const newScale = parseFloat(e.target.value);
+      const canvas = canvasRef.current;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const centerWorldPos = canvasToWorld(centerX, centerY, scale, origin);
+
+      // Adjust the origin
+      const newOrigin = {
+        x: centerWorldPos.x - centerX / newScale,
+        y: centerWorldPos.y - centerY / newScale,
+      };
+
+      setScale(newScale);
+      setOrigin(newOrigin);
+    },
+    [scale, origin]
+  );
+
+  // Reset zoom to default scale (1)
+  const handleResetZoom = () => {
+    const canvas = canvasRef.current;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const centerWorldPos = canvasToWorld(centerX, centerY, scale, origin);
+
+    // Adjust the origin
+    const newOrigin = {
+      x: centerWorldPos.x - centerX,
+      y: centerWorldPos.y - centerY,
+    };
+    setScale(1);
+    setOrigin(newOrigin);
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     canvas.addEventListener("wheel", handleScroll, { passive: false });
@@ -163,15 +234,37 @@ export default function CanvasPreview() {
   }, [scale, origin, lines, redraw]);
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div className="relative w-full h-full">
       <canvas
         ref={canvasRef}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        style={{ border: "1px solid black", cursor: "crosshair" }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onContextMenu={(e) => e.preventDefault()} // Disable right-click menu
+        className="border border-black cursor-crosshair"
       />
+      <div className="absolute bottom-16 right-8 flex items-center">
+        {/* Zoom Factor Text */}
+        <span className="mr-2">{scale.toFixed(1)}x</span>
+        {/* Zoom Slider */}
+        <input
+          type="range"
+          min="0.1"
+          max="5"
+          step="0.1"
+          value={scale}
+          onChange={handleSliderChange}
+          className="w-40"
+        />
+        {/* Reset Zoom Button */}
+        <button
+          onClick={handleResetZoom}
+          className="ml-2 bg-none text-blue-500 hover:underline"
+        >
+          Reset Zoom
+        </button>
+      </div>
     </div>
   );
 }

@@ -12,6 +12,7 @@ export default function App() {
 
   const [navBarHeight, setNavBarHeight] = useState(0); // Pour stocker la hauteur dynamique du NavBar
   const navBarRef = useRef(null); // Référence pour capturer l'élément NavBar
+  const [activeTool, setActiveTool] = useState("Brush");
 
   // Appliquer ou retirer la classe "dark" à l'élément <html> quand darkMode change
   useEffect(() => {
@@ -45,12 +46,16 @@ export default function App() {
   return (
     <div className="h-screen w-screen overflow-hidden app-container">
       <NavBar ref={navBarRef} setDarkMode={setDarkMode} darkMode={darkMode} />
-      <ToolBar navBarHeight={navBarHeight} />
+      <ToolBar
+        navBarHeight={navBarHeight}
+        activeTool={activeTool}
+        setActiveTool={setActiveTool}
+      />
       <div className="flex items-center justify-center h-screen bg-gray-100">
         {/* <h1 className="text-lg lg:text-4xl font-bold text-cyan-900 font-mono text-center">
           Bonjour, Drawing-AI V2 !
         </h1> */}
-        <CanvasPreview />
+        <CanvasPreview activeTool={activeTool} />
       </div>
     </div>
   );
