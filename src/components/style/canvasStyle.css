@@ -1,0 +1,39 @@
+input[type="range"] {
+  -webkit-appearance: none; /* Supprime le style par défaut */
+  appearance: none;
+  height: 4px; /* Hauteur de la barre */
+  background: #e5e7eb; /* Couleur de fond par défaut */
+}
+
+/* Style pour la barre à gauche (track) */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: #06b6d4; /* Couleur cyan-600 */
+  border-radius: 5px;
+}
+
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: #06b6d4; /* Couleur cyan-600 */
+  border-radius: 5px;
+}
+
+/* Style pour le thumb */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; /* Supprime le style par défaut */
+  appearance: none;
+  width: 16px; /* Largeur de la boule */
+  height: 16px; /* Hauteur de la boule */
+  background: #fff; /* Couleur de la boule */
+  border-radius: 50%; /* Boule ronde */
+  cursor: pointer; /* Curseur pointer */
+  margin-top: -6px; /* Ajuste la position de la boule */
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #fff; /* Couleur de la boule */
+  border-radius: 50%; /* Boule ronde */
+  cursor: pointer; /* Curseur pointer */
+}

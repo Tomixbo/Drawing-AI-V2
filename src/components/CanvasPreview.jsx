@@ -1,14 +1,28 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTrashCan } from "@fortawesome/free-solid-svg-icons";
+import "./style/canvasStyle.css";
 
-export default function CanvasPreview({ activeTool }) {
+export default function CanvasPreview({
+  navBarHeight,
+  activeTool,
+  toolBarPosition,
+}) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [isMiddleButtonDown, setIsMiddleButtonDown] = useState(false); // New state for middle button
   const [context, setContext] = useState(null);
   const [scale, setScale] = useState(1); // Zoom scale
   const [lines, setLines] = useState([]); // Store drawn lines
   const [origin, setOrigin] = useState({ x: 0, y: 0 }); // Origin for zoom
   const [panStart, setPanStart] = useState({ x: 0, y: 0 }); // Start position for panning
+
+  // Efface le canvas
+  const clearCanvas = () => {
+    setLines([]); // Réinitialise les lignes
+    redraw(); // Redessine le canvas
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -40,6 +54,7 @@ export default function CanvasPreview({ activeTool }) {
       }
       // Middle mouse button for panning
       if (e.button === 1) {
+        setIsMiddleButtonDown(true); // Set middle button state
         setIsPanning(true);
         setPanStart({ x: e.clientX, y: e.clientY });
       }
@@ -88,6 +103,7 @@ export default function CanvasPreview({ activeTool }) {
   const handleMouseUp = useCallback(() => {
     setIsDrawing(false);
     setIsPanning(false);
+    setIsMiddleButtonDown(false); // Reset middle button state
   }, []);
 
   // Redraw all lines
@@ -234,17 +250,35 @@ export default function CanvasPreview({ activeTool }) {
   }, [scale, origin, lines, redraw]);
 
   return (
-    <div className="relative w-full h-full">
+    <>
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onContextMenu={(e) => e.preventDefault()} // Disable right-click menu
-        className="border border-black cursor-crosshair"
+        onContextMenu={(e) => e.preventDefault()}
+        className="h-full w-full overflow-hidden"
+        style={{
+          cursor:
+            activeTool === "Pan" || isMiddleButtonDown ? "move" : "crosshair",
+        }}
       />
-      <div className="absolute bottom-16 right-8 flex items-center">
+
+      <div
+        className={`fixed flex items-center right-1/2 transform translate-x-1/2 md:right-8 md:translate-x-0`}
+        style={{
+          top: toolBarPosition === "bottom" ? `${32 + navBarHeight}px` : null,
+          bottom: toolBarPosition === "bottom" ? null : "32px",
+        }}
+      >
+        {/* Clear Canvas Button */}
+        <button
+          onClick={clearCanvas}
+          className="mr-2 text-grey-300 hover:text-cyan-600"
+        >
+          <FontAwesomeIcon icon={faTrashCan} />
+        </button>
         {/* Zoom Factor Text */}
         <span className="mr-2">{scale.toFixed(1)}x</span>
         {/* Zoom Slider */}
@@ -255,16 +289,19 @@ export default function CanvasPreview({ activeTool }) {
           step="0.1"
           value={scale}
           onChange={handleSliderChange}
-          className="w-40"
+          className="w-30"
+          style={{
+            backgroundColor: "rgba(204, 50, 50, 0.5)", // Couleur de fond pour le slider
+          }}
         />
         {/* Reset Zoom Button */}
         <button
           onClick={handleResetZoom}
-          className="ml-2 bg-none text-blue-500 hover:underline"
+          className="ml-2 bg-none text-grey-300 hover:text-cyan-600 hover:underline"
         >
           Reset Zoom
         </button>
       </div>
-    </div>
+    </>
   );
 }

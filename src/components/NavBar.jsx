@@ -50,7 +50,7 @@ const NavBar = React.forwardRef(({ setDarkMode, darkMode }, ref) => {
 
   return (
     <>
-      <nav ref={ref} className="bg-white dark:bg-gray-800 w-full ">
+      <nav ref={ref} className="bg-white dark:bg-gray-800 w-full h-auto">
         <div className="relative max-w-full mx-auto px-0 sm:px-0 lg:px-0 shadow-md z-50">
           <div className="flex justify-between mx-2 h-10 items-center">
             <img src={`/logo192.png`} alt="logo" className="h-8 w-auto ml-2" />

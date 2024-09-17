@@ -9,10 +9,16 @@ import {
   faArrowsUpDownLeftRight,
 } from "@fortawesome/free-solid-svg-icons";
 
-export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
+export default function ToolBar({
+  navBarHeight,
+  activeTool,
+  setActiveTool,
+  toolBarPosition,
+  setToolBarPosition,
+}) {
   const isDragging = useRef(false);
   const [isTransparent, setIsTransparent] = useState(false);
-  const [hoverPosition, setHoverPosition] = useState("left");
+
   const toolbarRef = useRef(null);
   const toolSize = 60;
 
@@ -44,13 +50,13 @@ export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
 
     if (isDragging.current) {
       if (y < topBoundary) {
-        setHoverPosition("top");
+        setToolBarPosition("top");
       } else if (y >= bottomBoundary) {
-        setHoverPosition("bottom");
+        setToolBarPosition("bottom");
       } else if (x < leftBoundary) {
-        setHoverPosition("left");
+        setToolBarPosition("left");
       } else if (x >= rightBoundary) {
-        setHoverPosition("right");
+        setToolBarPosition("right");
       }
     }
   };
@@ -151,22 +157,22 @@ export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
       <div
         ref={toolbarRef}
         className={`fixed z-20 transition-all duration-500 ease-in-out ${
-          hoverPosition === "left"
+          toolBarPosition === "left"
             ? "left-4 top-1/2 transform -translate-y-1/2"
-            : hoverPosition === "top"
+            : toolBarPosition === "top"
             ? "left-1/2 transform -translate-x-1/2"
-            : hoverPosition === "right"
+            : toolBarPosition === "right"
             ? "right-4 top-1/2 transform -translate-y-1/2"
             : "bottom-4 left-1/2 transform -translate-x-1/2"
         } flex ${
-          hoverPosition === "top" || hoverPosition === "bottom"
+          toolBarPosition === "top" || toolBarPosition === "bottom"
             ? "flex-row"
             : "flex-col"
         } items-center ${isTransparent ? "opacity-50" : ""}`} // Supprimer le fond de couleur (bg)
         style={{
-          top: hoverPosition === "top" ? `${navBarHeight + 16}px` : undefined,
+          top: toolBarPosition === "top" ? `${navBarHeight + 16}px` : undefined,
           height:
-            hoverPosition === "top" || hoverPosition === "bottom"
+            toolBarPosition === "top" || toolBarPosition === "bottom"
               ? `${toolSize}px`
               : undefined,
         }}
@@ -175,7 +181,7 @@ export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
         {/* Barre de mouvement - Double bar (qui déclenche le drag) */}
         <div
           className={`${
-            hoverPosition === "top" || hoverPosition === "bottom"
+            toolBarPosition === "top" || toolBarPosition === "bottom"
               ? "h-1/2 w-auto cursor-move mr-1.5" // Barre pour haut/bas
               : "w-1/2 h-auto cursor-move mb-1.5" // Barre pour gauche/droite
           } px-1 py-1 bg-white hover:bg-gray-200 dark:bg-gray-900 dark:hover:bg-gray-700 
@@ -185,21 +191,21 @@ export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
         >
           <div
             className={`${
-              hoverPosition === "top" || hoverPosition === "bottom"
+              toolBarPosition === "top" || toolBarPosition === "bottom"
                 ? "flex flex-row space-x-0.5 h-full"
                 : "flex flex-col space-y-0.5 w-full"
             }`}
           >
             <div
               className={`${
-                hoverPosition === "top" || hoverPosition === "bottom"
+                toolBarPosition === "top" || toolBarPosition === "bottom"
                   ? "w-px h-full bg-gray-600 dark:bg-gray-300"
                   : "w-full h-px bg-gray-600 dark:bg-gray-300"
               }`}
             />
             <div
               className={`${
-                hoverPosition === "top" || hoverPosition === "bottom"
+                toolBarPosition === "top" || toolBarPosition === "bottom"
                   ? "w-px h-full bg-gray-600 dark:bg-gray-300"
                   : "w-full h-px bg-gray-600 dark:bg-gray-300"
               }`}
@@ -210,7 +216,7 @@ export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
         {/* Boutons */}
         <div
           className={`flex ${
-            hoverPosition === "top" || hoverPosition === "bottom"
+            toolBarPosition === "top" || toolBarPosition === "bottom"
               ? "flex-row "
               : "flex-col "
           }`}
@@ -220,7 +226,7 @@ export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
             nameTool={"Pan"}
             iconSize={toolSize}
             activeTool={activeTool}
-            hoverPosition={hoverPosition}
+            toolBarPosition={toolBarPosition}
             handleFunction={handlePan}
             navBarHeight={navBarHeight}
           />
@@ -229,7 +235,7 @@ export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
             nameTool={"Brush"}
             iconSize={toolSize}
             activeTool={activeTool}
-            hoverPosition={hoverPosition}
+            toolBarPosition={toolBarPosition}
             handleFunction={handleBrush}
             navBarHeight={navBarHeight}
           />
@@ -238,7 +244,7 @@ export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
             nameTool={"Eraser"}
             iconSize={toolSize}
             activeTool={activeTool}
-            hoverPosition={hoverPosition}
+            toolBarPosition={toolBarPosition}
             handleFunction={handleEraser}
             navBarHeight={navBarHeight}
           />
@@ -247,7 +253,7 @@ export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
             nameTool={"Fill"}
             iconSize={toolSize}
             activeTool={activeTool}
-            hoverPosition={hoverPosition}
+            toolBarPosition={toolBarPosition}
             handleFunction={handleFill}
             navBarHeight={navBarHeight}
           />
@@ -255,13 +261,13 @@ export default function ToolBar({ navBarHeight, activeTool, setActiveTool }) {
             iconTool={faImage}
             nameTool={"Fill Image"}
             iconSize={toolSize}
-            hoverPosition={hoverPosition}
+            toolBarPosition={toolBarPosition}
             activeTool={activeTool}
             navBarHeight={navBarHeight}
           />
         </div>
       </div>
-      {isDragging.current ? <MenuZones navBarHeight={navBarHeight} /> : null}
+      {isDragging.current ? <MenuZones /> : null}
     </>
   );
 }
