@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import NavBar from "./components/NavBar";
 import ToolBar from "./components/ToolBar";
+import CanvasPreview from "./components/CanvasPreview";
 import "./main.css";
 
 export default function App() {
@@ -46,9 +47,10 @@ export default function App() {
       <NavBar ref={navBarRef} setDarkMode={setDarkMode} darkMode={darkMode} />
       <ToolBar navBarHeight={navBarHeight} />
       <div className="flex items-center justify-center h-screen bg-gray-100">
-        <h1 className="text-lg lg:text-4xl font-bold text-cyan-900 font-mono text-center">
+        {/* <h1 className="text-lg lg:text-4xl font-bold text-cyan-900 font-mono text-center">
           Bonjour, Drawing-AI V2 !
-        </h1>
+        </h1> */}
+        <CanvasPreview />
       </div>
     </div>
   );
