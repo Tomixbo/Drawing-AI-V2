@@ -267,7 +267,7 @@ export default function ToolBar({
           />
         </div>
       </div>
-      {isDragging.current ? <MenuZones /> : null}
+      {isDragging.current ? <MenuZones navBarHeight={navBarHeight} /> : null}
     </>
   );
 }

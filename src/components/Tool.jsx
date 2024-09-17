@@ -7,14 +7,14 @@ export default function Tool({
   nameTool,
   iconSize,
   activeTool,
-  hoverPosition,
+  toolBarPosition,
   handleFunction,
   navBarHeight,
 }) {
   const buttonRef = useRef(null); // Ref for the tool button
 
   const getParametersBarPosition = () => {
-    switch (hoverPosition) {
+    switch (toolBarPosition) {
       case "left":
         return "left-full ml-2"; // Place it to the right of the tool button
       case "right":
@@ -39,7 +39,7 @@ export default function Tool({
         } p-1 flex items-center justify-center shadow-md dark:shadow-none
         transform  hover:scale-110 duration-300 ease-in-out
         ${
-          hoverPosition === "top" || hoverPosition === "bottom"
+          toolBarPosition === "top" || toolBarPosition === "bottom"
             ? "mx-0.5 hover:mx-3"
             : "my-0.5 hover:my-3"
         }`}
@@ -62,7 +62,10 @@ export default function Tool({
       {/* Show ParametersBar only if mouse is near */}
       {activeTool === nameTool ? (
         <div className={`absolute ${getParametersBarPosition()}`}>
-          <ToolMenu hoverPosition={hoverPosition} navBarHeight={navBarHeight} />
+          <ToolMenu
+            toolBarPosition={toolBarPosition}
+            navBarHeight={navBarHeight}
+          />
         </div>
       ) : null}
     </div>

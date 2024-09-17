@@ -258,7 +258,7 @@ export default function CanvasPreview({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onContextMenu={(e) => e.preventDefault()}
-        className="h-full w-full overflow-hidden"
+        className="overflow-hidden"
         style={{
           cursor:
             activeTool === "Pan" || isMiddleButtonDown ? "move" : "crosshair",
@@ -266,7 +266,7 @@ export default function CanvasPreview({
       />
 
       <div
-        className={`fixed flex items-center right-1/2 transform translate-x-1/2 md:right-8 md:translate-x-0`}
+        className={`fixed flex items-center right-1/2 transform translate-x-1/2 md:right-8 md:translate-x-0 `}
         style={{
           top: toolBarPosition === "bottom" ? `${32 + navBarHeight}px` : null,
           bottom: toolBarPosition === "bottom" ? null : "32px",
@@ -297,7 +297,7 @@ export default function CanvasPreview({
         {/* Reset Zoom Button */}
         <button
           onClick={handleResetZoom}
-          className="ml-2 bg-none text-grey-300 hover:text-cyan-600 hover:underline"
+          className="ml-2 bg-none text-grey-300 hover:text-cyan-600 hover:underline "
         >
           Reset Zoom
         </button>

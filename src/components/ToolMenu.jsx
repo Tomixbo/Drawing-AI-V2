@@ -2,17 +2,17 @@ import React, { useState, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSliders } from "@fortawesome/free-solid-svg-icons";
 
-export default function ToolMenu({ navBarHeight, hoverPosition }) {
+export default function ToolMenu({ navBarHeight, toolBarPosition }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const timeoutRef = useRef(null); // Ref to store the timeout
 
-  // Create a ref to track hoverPosition
-  const hoverPositionRef = useRef(hoverPosition);
+  // Create a ref to track toolBarPosition
+  const toolBarPositionRef = useRef(toolBarPosition);
 
   useEffect(() => {
-    // Update the hoverPositionRef when hoverPosition changes
-    hoverPositionRef.current = hoverPosition;
-  }, [hoverPosition]);
+    // Update the toolBarPositionRef when toolBarPosition changes
+    toolBarPositionRef.current = toolBarPosition;
+  }, [toolBarPosition]);
 
   const handleClick = () => {
     setIsExpanded(true); // Expand the container
@@ -46,11 +46,11 @@ export default function ToolMenu({ navBarHeight, hoverPosition }) {
         className={`absolute flex items-center justify-center transition-all duration-300 ease-in-out bg-white text-black dark:bg-cyan-950 dark:text-gray-300 
          shadow-md z-20
         ${
-          hoverPosition === "top"
+          toolBarPosition === "top"
             ? "top-0 left-1/2 transform -translate-x-1/2"
-            : hoverPosition === "left"
+            : toolBarPosition === "left"
             ? "left-0 top-1/2 transform -translate-y-1/2"
-            : hoverPosition === "bottom"
+            : toolBarPosition === "bottom"
             ? "bottom-0 left-1/2 transform -translate-x-1/2"
             : "right-0 top-1/2 transform -translate-y-1/2"
         }
