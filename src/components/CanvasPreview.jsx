@@ -5,23 +5,23 @@ import "./style/canvasStyle.css";
 
 export default function CanvasPreview({
   navBarHeight,
-  activeTool,
+  activeTool, // "Brush", "Pan", "Eraser"
   toolBarPosition,
 }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
-  const [isMiddleButtonDown, setIsMiddleButtonDown] = useState(false); // New state for middle button
+  const [isMiddleButtonDown, setIsMiddleButtonDown] = useState(false);
   const [context, setContext] = useState(null);
   const [scale, setScale] = useState(1); // Zoom scale
-  const [lines, setLines] = useState([]); // Store drawn lines
-  const [origin, setOrigin] = useState({ x: 0, y: 0 }); // Origin for zoom
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 }); // Start position for panning
+  const [lines, setLines] = useState([]); // Each line is { tool: 'brush' | 'eraser', points: [...] }
+  const [origin, setOrigin] = useState({ x: 0, y: 0 });
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
-  // Efface le canvas
+  // Clear the canvas
   const clearCanvas = () => {
-    setLines([]); // Réinitialise les lignes
-    redraw(); // Redessine le canvas
+    setLines([]); // Reset lines
+    redraw(); // Redraw the canvas
   };
 
   useEffect(() => {
@@ -45,12 +45,18 @@ export default function CanvasPreview({
         // Left mouse button for panning
         setIsPanning(true);
         setPanStart({ x: e.clientX, y: e.clientY });
-      } else if (activeTool === "Brush" && e.button === 0) {
-        // Left mouse button for drawing
+      } else if (
+        (activeTool === "Brush" || activeTool === "Eraser") &&
+        e.button === 0
+      ) {
+        // Left mouse button for drawing or erasing
         setIsDrawing(true);
         const { offsetX, offsetY } = e.nativeEvent;
         const point = canvasToWorld(offsetX, offsetY, scale, origin);
-        setLines((prevLines) => [...prevLines, [point]]);
+        setLines((prevLines) => [
+          ...prevLines,
+          { tool: activeTool.toLowerCase(), points: [point] }, // Store tool type
+        ]);
       }
       // Middle mouse button for panning
       if (e.button === 1) {
@@ -86,10 +92,8 @@ export default function CanvasPreview({
         const point = canvasToWorld(offsetX, offsetY, scale, origin);
         setLines((prevLines) => {
           const newLines = [...prevLines];
-          newLines[newLines.length - 1] = [
-            ...newLines[newLines.length - 1],
-            point,
-          ];
+          const currentLine = newLines[newLines.length - 1];
+          currentLine.points = [...currentLine.points, point];
           return newLines;
         });
       } else if (isPanning) {
@@ -103,7 +107,7 @@ export default function CanvasPreview({
   const handleMouseUp = useCallback(() => {
     setIsDrawing(false);
     setIsPanning(false);
-    setIsMiddleButtonDown(false); // Reset middle button state
+    setIsMiddleButtonDown(false);
   }, []);
 
   // Redraw all lines
@@ -130,7 +134,17 @@ export default function CanvasPreview({
     // Draw lines
     lines.forEach((line) => {
       context.beginPath();
-      line.forEach((point, index) => {
+
+      // Set composite operation and line width based on tool
+      if (line.tool === "eraser") {
+        context.globalCompositeOperation = "destination-out";
+        context.lineWidth = 20; // Adjust eraser size as needed
+      } else {
+        context.globalCompositeOperation = "source-over";
+        context.lineWidth = 2; // Adjust brush size as needed
+      }
+
+      line.points.forEach((point, index) => {
         if (index === 0) {
           context.moveTo(point.x, point.y);
         } else {
@@ -139,6 +153,9 @@ export default function CanvasPreview({
       });
       context.stroke();
     });
+
+    // Reset composite operation to default
+    context.globalCompositeOperation = "source-over";
 
     context.restore();
   }, [context, lines, scale, origin]);
@@ -261,12 +278,16 @@ export default function CanvasPreview({
         className="overflow-hidden"
         style={{
           cursor:
-            activeTool === "Pan" || isMiddleButtonDown ? "move" : "crosshair",
+            activeTool === "Pan" || isMiddleButtonDown
+              ? "move"
+              : activeTool === "Eraser"
+              ? "pointer"
+              : "crosshair",
         }}
       />
 
       <div
-        className={`fixed flex items-center right-1/2 transform translate-x-1/2 md:right-8 md:translate-x-0 `}
+        className={`fixed flex items-center right-1/2 transform translate-x-1/2 md:right-8 md:translate-x-0`}
         style={{
           top: toolBarPosition === "bottom" ? `${32 + navBarHeight}px` : null,
           bottom: toolBarPosition === "bottom" ? null : "32px",
@@ -291,16 +312,17 @@ export default function CanvasPreview({
           onChange={handleSliderChange}
           className="w-30"
           style={{
-            backgroundColor: "rgba(204, 50, 50, 0.5)", // Couleur de fond pour le slider
+            backgroundColor: "rgba(204, 50, 50, 0.5)", // Slider background color
           }}
         />
         {/* Reset Zoom Button */}
         <button
           onClick={handleResetZoom}
-          className="ml-2 bg-none text-grey-300 hover:text-cyan-600 hover:underline "
+          className="ml-2 bg-none text-grey-300 hover:text-cyan-600 hover:underline"
         >
           Reset Zoom
         </button>
+        {/* Note: Tool selection buttons (Brush, Eraser, Pan) are managed externally */}
       </div>
     </>
   );
