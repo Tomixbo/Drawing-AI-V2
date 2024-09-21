@@ -8,6 +8,7 @@ import {
   faImage,
   faArrowsUpDownLeftRight,
 } from "@fortawesome/free-solid-svg-icons";
+import ColorSelect from "./ColorSelect";
 
 export default function ToolBar({
   navBarHeight,
@@ -15,6 +16,8 @@ export default function ToolBar({
   setActiveTool,
   toolBarPosition,
   setToolBarPosition,
+  brushSize,
+  setBrushSize,
 }) {
   const isDragging = useRef(false);
   const [isTransparent, setIsTransparent] = useState(false);
@@ -229,6 +232,8 @@ export default function ToolBar({
             toolBarPosition={toolBarPosition}
             handleFunction={handlePan}
             navBarHeight={navBarHeight}
+            brushSize={brushSize}
+            setBrushSize={setBrushSize}
           />
           <Tool
             iconTool={faPaintBrush}
@@ -238,6 +243,8 @@ export default function ToolBar({
             toolBarPosition={toolBarPosition}
             handleFunction={handleBrush}
             navBarHeight={navBarHeight}
+            brushSize={brushSize}
+            setBrushSize={setBrushSize}
           />
           <Tool
             iconTool={faEraser}
@@ -247,6 +254,8 @@ export default function ToolBar({
             toolBarPosition={toolBarPosition}
             handleFunction={handleEraser}
             navBarHeight={navBarHeight}
+            brushSize={brushSize}
+            setBrushSize={setBrushSize}
           />
           <Tool
             iconTool={faFillDrip}
@@ -256,6 +265,8 @@ export default function ToolBar({
             toolBarPosition={toolBarPosition}
             handleFunction={handleFill}
             navBarHeight={navBarHeight}
+            brushSize={brushSize}
+            setBrushSize={setBrushSize}
           />
           <Tool
             iconTool={faImage}
@@ -264,7 +275,10 @@ export default function ToolBar({
             toolBarPosition={toolBarPosition}
             activeTool={activeTool}
             navBarHeight={navBarHeight}
+            brushSize={brushSize}
+            setBrushSize={setBrushSize}
           />
+          <ColorSelect iconSize={toolSize} toolBarPosition={toolBarPosition} />
         </div>
       </div>
       {isDragging.current ? <MenuZones navBarHeight={navBarHeight} /> : null}

@@ -1,8 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSliders } from "@fortawesome/free-solid-svg-icons";
+import ParametersBrush from "./ParametersBrush";
 
-export default function ToolMenu({ navBarHeight, toolBarPosition }) {
+export default function ToolMenu({
+  navBarHeight,
+  toolBarPosition,
+  activeTool,
+  brushSize,
+  setBrushSize,
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
   const timeoutRef = useRef(null); // Ref to store the timeout
 
@@ -44,7 +51,7 @@ export default function ToolMenu({ navBarHeight, toolBarPosition }) {
     >
       <div
         className={`absolute flex items-center justify-center transition-all duration-300 ease-in-out bg-white text-black dark:bg-cyan-950 dark:text-gray-300 
-         shadow-md z-20
+         shadow-md z-20 
         ${
           toolBarPosition === "top"
             ? "top-0 left-1/2 transform -translate-x-1/2"
@@ -56,14 +63,18 @@ export default function ToolMenu({ navBarHeight, toolBarPosition }) {
         }
         `}
         style={{
-          width: isExpanded ? "200px" : "0", // Expand width to 200px when isExpanded is true
+          width: isExpanded ? "auto" : "0", // Expand width to 200px when isExpanded is true
           height: "50px", // Fixed height
           borderRadius: "8px",
           overflow: "hidden",
           whiteSpace: "nowrap", // Prevent text wrapping
         }}
       >
-        <span className="text-sm">Adjust Parameters</span>
+        {activeTool === "Brush" ? (
+          <ParametersBrush brushSize={brushSize} setBrushSize={setBrushSize} />
+        ) : (
+          <span className="text-sm mx-2">Adjust Parameters</span>
+        )}
       </div>
 
       <div

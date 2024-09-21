@@ -7,6 +7,7 @@ export default function CanvasPreview({
   navBarHeight,
   activeTool, // "Brush", "Pan", "Eraser"
   toolBarPosition,
+  brushSize,
 }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -17,6 +18,10 @@ export default function CanvasPreview({
   const [lines, setLines] = useState([]); // Each line is { tool: 'brush' | 'eraser', points: [...] }
   const [origin, setOrigin] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const brushSizeRef = useRef(brushSize);
+  const distance = (p1, p2) => {
+    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+  };
 
   // Clear the canvas
   const clearCanvas = () => {
@@ -38,29 +43,30 @@ export default function CanvasPreview({
     y: y / scale + origin.y,
   });
 
-  // Start drawing or pan
+  // Start drawing or pan with mouse
   const handleMouseDown = useCallback(
     (e) => {
       if (activeTool === "Pan" && e.button === 0) {
-        // Left mouse button for panning
         setIsPanning(true);
         setPanStart({ x: e.clientX, y: e.clientY });
       } else if (
         (activeTool === "Brush" || activeTool === "Eraser") &&
         e.button === 0
       ) {
-        // Left mouse button for drawing or erasing
         setIsDrawing(true);
         const { offsetX, offsetY } = e.nativeEvent;
         const point = canvasToWorld(offsetX, offsetY, scale, origin);
         setLines((prevLines) => [
           ...prevLines,
-          { tool: activeTool.toLowerCase(), points: [point] }, // Store tool type
+          {
+            tool: activeTool.toLowerCase(),
+            brushSize: brushSizeRef.current,
+            points: [point],
+          }, // Store tool type
         ]);
       }
-      // Middle mouse button for panning
       if (e.button === 1) {
-        setIsMiddleButtonDown(true); // Set middle button state
+        setIsMiddleButtonDown(true);
         setIsPanning(true);
         setPanStart({ x: e.clientX, y: e.clientY });
       }
@@ -68,7 +74,35 @@ export default function CanvasPreview({
     [scale, origin, activeTool]
   );
 
-  // Handle panning
+  // Start drawing or panning with touch
+  const handleTouchStart = useCallback(
+    (e) => {
+      const touch = e.touches[0];
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect(); // Get the canvas position relative to viewport
+      const offsetX = touch.clientX - rect.left;
+      const offsetY = touch.clientY - rect.top;
+
+      if (activeTool === "Pan") {
+        setIsPanning(true);
+        setPanStart({ x: touch.clientX, y: touch.clientY });
+      } else if (activeTool === "Brush" || activeTool === "Eraser") {
+        setIsDrawing(true);
+        const point = canvasToWorld(offsetX, offsetY, scale, origin);
+        setLines((prevLines) => [
+          ...prevLines,
+          {
+            tool: activeTool.toLowerCase(),
+            brushSize: brushSizeRef.current,
+            points: [point],
+          },
+        ]);
+      }
+    },
+    [scale, origin, activeTool]
+  );
+
+  // Handle panning with mouse
   const handlePan = useCallback(
     (e) => {
       if (!isPanning) return;
@@ -84,7 +118,23 @@ export default function CanvasPreview({
     [isPanning, panStart, scale]
   );
 
-  // Draw while mouse is moving
+  // Handle panning with touch
+  const handleTouchPan = useCallback(
+    (e) => {
+      if (!isPanning) return;
+      const touch = e.touches[0];
+      const dx = (touch.clientX - panStart.x) / scale;
+      const dy = (touch.clientY - panStart.y) / scale;
+
+      setOrigin((prevOrigin) => ({
+        x: prevOrigin.x - dx,
+        y: prevOrigin.y - dy,
+      }));
+      setPanStart({ x: touch.clientX, y: touch.clientY });
+    },
+    [isPanning, panStart, scale]
+  );
+
   const handleMouseMove = useCallback(
     (e) => {
       if (isDrawing) {
@@ -93,7 +143,16 @@ export default function CanvasPreview({
         setLines((prevLines) => {
           const newLines = [...prevLines];
           const currentLine = newLines[newLines.length - 1];
-          currentLine.points = [...currentLine.points, point];
+
+          // Ajoute seulement le point si la distance est suffisante
+          if (
+            currentLine.points.length === 0 ||
+            distance(currentLine.points[currentLine.points.length - 1], point) >
+              2
+          ) {
+            currentLine.points = [...currentLine.points, point];
+          }
+
           return newLines;
         });
       } else if (isPanning) {
@@ -103,24 +162,78 @@ export default function CanvasPreview({
     [isDrawing, scale, origin, isPanning, handlePan]
   );
 
-  // Stop drawing or panning
+  const handleTouchMove = useCallback(
+    (e) => {
+      const touch = e.touches[0];
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const offsetX = touch.clientX - rect.left;
+      const offsetY = touch.clientY - rect.top;
+
+      if (isDrawing) {
+        const point = canvasToWorld(offsetX, offsetY, scale, origin);
+        setLines((prevLines) => {
+          const newLines = [...prevLines];
+          const currentLine = newLines[newLines.length - 1];
+
+          // Ajoute seulement le point si la distance est suffisante
+          if (
+            currentLine.points.length === 0 ||
+            distance(currentLine.points[currentLine.points.length - 1], point) >
+              2
+          ) {
+            currentLine.points = [...currentLine.points, point];
+          }
+
+          return newLines;
+        });
+      } else if (isPanning) {
+        handleTouchPan(e);
+      }
+    },
+    [isDrawing, scale, origin, isPanning, handleTouchPan]
+  );
+
+  // Stop drawing or panning for mouse
   const handleMouseUp = useCallback(() => {
     setIsDrawing(false);
     setIsPanning(false);
     setIsMiddleButtonDown(false);
   }, []);
 
+  // Stop drawing or panning for touch
+  const handleTouchEnd = useCallback(() => {
+    setIsDrawing(false);
+    setIsPanning(false);
+  }, []);
+
+  const drawSmoothLine = (ctx, points) => {
+    if (points.length < 2) return;
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+
+    for (let i = 1; i < points.length - 1; i++) {
+      const midPoint = {
+        x: (points[i].x + points[i + 1].x) / 2,
+        y: (points[i].y + points[i + 1].y) / 2,
+      };
+      ctx.quadraticCurveTo(points[i].x, points[i].y, midPoint.x, midPoint.y);
+    }
+
+    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+    ctx.stroke();
+  };
+
   // Redraw all lines
   const redraw = useCallback(() => {
     if (!context) return;
 
-    // Clear the canvas
     context.save();
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     context.restore();
 
-    // Apply transformations
     context.save();
     context.setTransform(
       scale,
@@ -131,36 +244,33 @@ export default function CanvasPreview({
       -origin.y * scale
     );
 
-    // Draw lines
     lines.forEach((line) => {
       context.beginPath();
 
-      // Set composite operation and line width based on tool
       if (line.tool === "eraser") {
         context.globalCompositeOperation = "destination-out";
-        context.lineWidth = 20; // Adjust eraser size as needed
+        context.lineWidth = 20;
       } else {
         context.globalCompositeOperation = "source-over";
-        context.lineWidth = 2; // Adjust brush size as needed
+        context.lineWidth = line.brushSize; // Utilise la taille du pinceau stockée
       }
 
-      line.points.forEach((point, index) => {
-        if (index === 0) {
-          context.moveTo(point.x, point.y);
-        } else {
-          context.lineTo(point.x, point.y);
-        }
-      });
-      context.stroke();
+      // Remplace le tracé classique par des courbes lissées
+      if (line.points.length > 1) {
+        drawSmoothLine(context, line.points); // Fonction de courbe de Bézier
+      } else {
+        // Si une seule ligne, dessiner un point simple
+        const point = line.points[0];
+        context.arc(point.x, point.y, line.brushSize / 2, 0, 2 * Math.PI);
+        context.fill();
+      }
     });
 
-    // Reset composite operation to default
     context.globalCompositeOperation = "source-over";
-
     context.restore();
   }, [context, lines, scale, origin]);
 
-  // Handle zoom using keyboard shortcuts (zoom from the center)
+  // Handle zoom using keyboard shortcuts
   const zoomFromCenter = useCallback(
     (e) => {
       if (e.ctrlKey) {
@@ -173,7 +283,6 @@ export default function CanvasPreview({
         if (e.key === "+") newScale *= 1.1;
         if (e.key === "-") newScale /= 1.1;
 
-        // Adjust the origin
         const newOrigin = {
           x: centerWorldPos.x - centerX / newScale,
           y: centerWorldPos.y - centerY / newScale,
@@ -186,21 +295,20 @@ export default function CanvasPreview({
     [scale, origin]
   );
 
-  // Handle zoom using mouse scroll (zoom at the cursor position)
+  // Handle zoom using mouse scroll
   const handleScroll = useCallback(
     (e) => {
-      e.preventDefault(); // Prevent default scroll behavior
+      e.preventDefault();
       const { offsetX, offsetY } = e;
       const mouseWorldPos = canvasToWorld(offsetX, offsetY, scale, origin);
 
       let newScale = scale;
       if (e.deltaY < 0) {
-        newScale *= 1.1; // Scroll up to zoom in
+        newScale *= 1.1;
       } else {
-        newScale /= 1.1; // Scroll down to zoom out
+        newScale /= 1.1;
       }
 
-      // Adjust the origin
       const newOrigin = {
         x: mouseWorldPos.x - offsetX / newScale,
         y: mouseWorldPos.y - offsetY / newScale,
@@ -221,7 +329,6 @@ export default function CanvasPreview({
       const centerY = canvas.height / 2;
       const centerWorldPos = canvasToWorld(centerX, centerY, scale, origin);
 
-      // Adjust the origin
       const newOrigin = {
         x: centerWorldPos.x - centerX / newScale,
         y: centerWorldPos.y - centerY / newScale,
@@ -240,7 +347,6 @@ export default function CanvasPreview({
     const centerY = canvas.height / 2;
     const centerWorldPos = canvasToWorld(centerX, centerY, scale, origin);
 
-    // Adjust the origin
     const newOrigin = {
       x: centerWorldPos.x - centerX,
       y: centerWorldPos.y - centerY,
@@ -266,13 +372,20 @@ export default function CanvasPreview({
     redraw();
   }, [scale, origin, lines, redraw]);
 
+  useEffect(() => {
+    brushSizeRef.current = brushSize;
+  }, [brushSize]);
+
   return (
     <>
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
         onMouseMove={handleMouseMove}
+        onTouchMove={handleTouchMove}
         onMouseUp={handleMouseUp}
+        onTouchEnd={handleTouchEnd}
         onMouseLeave={handleMouseUp}
         onContextMenu={(e) => e.preventDefault()}
         className="overflow-hidden"
@@ -293,16 +406,13 @@ export default function CanvasPreview({
           bottom: toolBarPosition === "bottom" ? null : "32px",
         }}
       >
-        {/* Clear Canvas Button */}
         <button
           onClick={clearCanvas}
           className="mr-2 text-grey-300 hover:text-cyan-600"
         >
           <FontAwesomeIcon icon={faTrashCan} />
         </button>
-        {/* Zoom Factor Text */}
         <span className="mr-2">{scale.toFixed(1)}x</span>
-        {/* Zoom Slider */}
         <input
           type="range"
           min="0.1"
@@ -311,18 +421,13 @@ export default function CanvasPreview({
           value={scale}
           onChange={handleSliderChange}
           className="w-30"
-          style={{
-            backgroundColor: "rgba(204, 50, 50, 0.5)", // Slider background color
-          }}
         />
-        {/* Reset Zoom Button */}
         <button
           onClick={handleResetZoom}
           className="ml-2 bg-none text-grey-300 hover:text-cyan-600 hover:underline"
         >
           Reset Zoom
         </button>
-        {/* Note: Tool selection buttons (Brush, Eraser, Pan) are managed externally */}
       </div>
     </>
   );

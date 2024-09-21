@@ -14,6 +14,7 @@ export default function App() {
   const navBarRef = useRef(null); // Référence pour capturer l'élément NavBar
   const [activeTool, setActiveTool] = useState("Brush");
   const [toolBarPosition, setToolBarPosition] = useState("left");
+  const [brushSize, setBrushSize] = useState(2);
 
   // Appliquer ou retirer la classe "dark" à l'élément <html> quand darkMode change
   useEffect(() => {
@@ -55,12 +56,15 @@ export default function App() {
           setActiveTool={setActiveTool}
           toolBarPosition={toolBarPosition}
           setToolBarPosition={setToolBarPosition}
+          brushSize={brushSize}
+          setBrushSize={setBrushSize}
         />
 
         <CanvasPreview
           navBarHeight={navBarHeight}
           activeTool={activeTool}
           toolBarPosition={toolBarPosition}
+          brushSize={brushSize}
         />
       </div>
     </div>

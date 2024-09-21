@@ -10,6 +10,8 @@ export default function Tool({
   toolBarPosition,
   handleFunction,
   navBarHeight,
+  brushSize,
+  setBrushSize,
 }) {
   const buttonRef = useRef(null); // Ref for the tool button
 
@@ -65,6 +67,9 @@ export default function Tool({
           <ToolMenu
             toolBarPosition={toolBarPosition}
             navBarHeight={navBarHeight}
+            activeTool={activeTool}
+            brushSize={brushSize}
+            setBrushSize={setBrushSize}
           />
         </div>
       ) : null}
