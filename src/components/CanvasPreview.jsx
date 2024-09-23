@@ -5,7 +5,7 @@ import "./style/canvasStyle.css";
 
 export default function CanvasPreview({
   navBarHeight,
-  activeTool, // "Brush", "Pan", "Eraser"
+  activeTool, // "Brush", "Pan", "Eraser", "Fill"
   toolBarPosition,
   brushSize,
   currentColor,
@@ -16,15 +16,25 @@ export default function CanvasPreview({
   const [isMiddleButtonDown, setIsMiddleButtonDown] = useState(false);
   const [context, setContext] = useState(null);
   const [scale, setScale] = useState(1); // Zoom scale
-  const [lines, setLines] = useState([]); // Each line is { tool: 'brush' | 'eraser', points: [...] }
+  const [actions, setActions] = useState([]); // Each action is { type: 'line' | 'fill', ... }
   const [origin, setOrigin] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const brushSizeRef = useRef(brushSize);
   const currentColorRef = useRef(currentColor);
+  const scaleRef = useRef(scale);
+  const originRef = useRef(origin);
+
+  useEffect(() => {
+    scaleRef.current = scale;
+    originRef.current = origin;
+  }, [scale, origin]);
+
+  // Helper function to calculate distance between two points
   const distance = (p1, p2) => {
     return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
   };
 
+  // Convert hex color to RGBA array
   const hexToRgba = (hex) => {
     const bigint = parseInt(hex.slice(1), 16);
     return [
@@ -35,6 +45,7 @@ export default function CanvasPreview({
     ];
   };
 
+  // Compare two colors with a tolerance
   const colorMatch = (target, current, tolerance = 30) => {
     return (
       Math.abs(target[0] - current[0]) <= tolerance && // Red
@@ -44,6 +55,7 @@ export default function CanvasPreview({
     );
   };
 
+  // Flood Fill Algorithm
   const floodFill = (startX, startY, fillColor, ctx) => {
     const canvas = ctx.canvas;
     const width = canvas.width;
@@ -52,12 +64,17 @@ export default function CanvasPreview({
     const data = imgData.data;
 
     const stack = [[startX, startY]];
+    const targetPos = (startY * width + startX) * 4;
     const targetColor = [
-      data[(startY * width + startX) * 4], // Red
-      data[(startY * width + startX) * 4 + 1], // Green
-      data[(startY * width + startX) * 4 + 2], // Blue
-      data[(startY * width + startX) * 4 + 3], // Alpha
+      data[targetPos], // Red
+      data[targetPos + 1], // Green
+      data[targetPos + 2], // Blue
+      data[targetPos + 3], // Alpha
     ];
+
+    if (colorMatch(targetColor, fillColor)) {
+      return; // Prevent infinite loop if target color is same as fill color
+    }
 
     const isSameColor = (pixelPos) => {
       const currentColor = [
@@ -66,15 +83,7 @@ export default function CanvasPreview({
         data[pixelPos + 2], // Blue
         data[pixelPos + 3], // Alpha
       ];
-
-      const match = colorMatch(targetColor, currentColor);
-      console.log(
-        `Checking pixel at position: ${
-          pixelPos / 4
-        }, match: ${match}, currentColor:`,
-        currentColor
-      );
-      return match;
+      return colorMatch(targetColor, currentColor);
     };
 
     const setPixelColor = (pixelPos) => {
@@ -82,35 +91,34 @@ export default function CanvasPreview({
       data[pixelPos + 1] = fillColor[1]; // Green
       data[pixelPos + 2] = fillColor[2]; // Blue
       data[pixelPos + 3] = fillColor[3]; // Alpha
-      console.log(
-        `Filling pixel at position: ${pixelPos} with color:`,
-        fillColor
-      );
     };
 
     while (stack.length) {
-      let [px, py] = stack.pop();
-      let pixelPos = (py * width + px) * 4;
+      const [px, py] = stack.pop();
+      let currentX = px;
+      let currentY = py;
+      let pixelPos = (currentY * width + currentX) * 4;
 
-      // Move to the left until a different color
-      while (px >= 0 && isSameColor(pixelPos)) {
-        px--;
-        pixelPos = (py * width + px) * 4;
+      // Move to the leftmost pixel that matches the target color
+      while (currentX >= 0 && isSameColor(pixelPos)) {
+        currentX--;
+        pixelPos = (currentY * width + currentX) * 4;
       }
-      px++;
+      currentX++;
+      pixelPos = (currentY * width + currentX) * 4;
 
       let reachLeft = false;
       let reachRight = false;
 
-      // Fill the new line
-      while (px < width && isSameColor(pixelPos)) {
+      // Move to the right, fill pixels and check adjacent pixels
+      while (currentX < width && isSameColor(pixelPos)) {
         setPixelColor(pixelPos);
 
-        if (py > 0) {
+        // Check pixel above
+        if (currentY > 0) {
           if (isSameColor(pixelPos - width * 4)) {
             if (!reachLeft) {
-              console.log(`Adding pixel to stack: [${px}, ${py - 1}]`);
-              stack.push([px, py - 1]);
+              stack.push([currentX, currentY - 1]);
               reachLeft = true;
             }
           } else {
@@ -118,11 +126,11 @@ export default function CanvasPreview({
           }
         }
 
-        if (py < height - 1) {
+        // Check pixel below
+        if (currentY < height - 1) {
           if (isSameColor(pixelPos + width * 4)) {
             if (!reachRight) {
-              console.log(`Adding pixel to stack: [${px}, ${py + 1}]`);
-              stack.push([px, py + 1]);
+              stack.push([currentX, currentY + 1]);
               reachRight = true;
             }
           } else {
@@ -130,38 +138,59 @@ export default function CanvasPreview({
           }
         }
 
-        px++;
-        pixelPos = (py * width + px) * 4;
+        currentX++;
+        pixelPos = (currentY * width + currentX) * 4;
       }
     }
 
-    console.log("Fill complete");
     ctx.putImageData(imgData, 0, 0); // Apply the changes
   };
 
-  // Clear the canvas
-  const clearCanvas = () => {
-    setLines([]); // Reset lines
-    redraw(); // Redraw the canvas
-  };
-
+  // Initialize the canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     canvas.width = canvas.parentElement.clientWidth;
     canvas.height = canvas.parentElement.clientHeight;
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
     setContext(ctx);
   }, []);
 
-  const canvasToWorld = (x, y, scale, origin) => ({
-    x: x / scale + origin.x,
-    y: y / scale + origin.y,
+  // Convert screen coordinates to world coordinates
+  const canvasToWorld = (x, y) => ({
+    x: x / scaleRef.current + originRef.current.x,
+    y: y / scaleRef.current + originRef.current.y,
   });
 
-  // Start drawing or pan with mouse
+  // Convert world coordinates to pixel coordinates
+  const worldToPixel = (worldX, worldY) => ({
+    x: Math.floor((worldX - originRef.current.x) * scaleRef.current),
+    y: Math.floor((worldY - originRef.current.y) * scaleRef.current),
+  });
+
+  // Clear the canvas and reset actions
+  const clearCanvas = useCallback(() => {
+    setActions([]); // Reset actions
+    if (context) {
+      context.save();
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(
+        0,
+        0,
+        canvasRef.current.width,
+        canvasRef.current.height
+      );
+      context.restore();
+    }
+  }, [context]);
+
+  // Handle mouse down events
   const handleMouseDown = useCallback(
     (e) => {
+      e.preventDefault();
+      if (!context) return;
+
       if (activeTool === "Pan" && e.button === 0) {
         setIsPanning(true);
         setPanStart({ x: e.clientX, y: e.clientY });
@@ -171,37 +200,61 @@ export default function CanvasPreview({
       ) {
         setIsDrawing(true);
         const { offsetX, offsetY } = e.nativeEvent;
-        const point = canvasToWorld(offsetX, offsetY, scale, origin);
-        setLines((prevLines) => [
-          ...prevLines,
-          {
-            tool: activeTool.toLowerCase(),
-            brushSize: brushSizeRef.current,
-            currentColor: currentColorRef.current,
-            points: [point],
-          }, // Store tool type
-        ]);
+        const worldPos = canvasToWorld(offsetX, offsetY);
+        const newAction = {
+          type: "line",
+          tool: activeTool.toLowerCase(),
+          brushSize: brushSizeRef.current,
+          currentColor: currentColorRef.current,
+          points: [{ x: worldPos.x, y: worldPos.y }],
+        };
+        setActions((prevActions) => [...prevActions, newAction]);
+
+        // Begin path for immediate drawing
+        // context.beginPath();
+        // context.moveTo(worldPos.x, worldPos.y);
+        // context.lineWidth = brushSizeRef.current;
+        // context.strokeStyle =
+        //   activeTool === "Eraser" ? "rgba(0,0,0,1)" : currentColorRef.current;
+        // context.globalCompositeOperation =
+        //   activeTool === "Eraser" ? "destination-out" : "source-over";
       } else if (activeTool === "Fill" && e.button === 0) {
         const { offsetX, offsetY } = e.nativeEvent;
-        const fillColor = hexToRgba(currentColorRef.current); // Convertir la couleur actuelle en format RGBA
-        floodFill(offsetX, offsetY, fillColor, context);
+        const worldPos = canvasToWorld(offsetX, offsetY);
+        const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+        const fillColor = hexToRgba(currentColorRef.current);
+
+        // Perform flood fill
+        floodFill(pixelPos.x, pixelPos.y, fillColor, context);
+
+        // Record the fill action
+        const newAction = {
+          type: "fill",
+          x: pixelPos.x,
+          y: pixelPos.y,
+          fillColor: fillColor,
+        };
+        setActions((prevActions) => [...prevActions, newAction]);
       }
 
       if (e.button === 1) {
+        // Middle button for panning
         setIsMiddleButtonDown(true);
         setIsPanning(true);
         setPanStart({ x: e.clientX, y: e.clientY });
       }
     },
-    [scale, origin, activeTool]
+    [activeTool, context]
   );
 
-  // Start drawing or panning with touch
+  // Handle touch start events
   const handleTouchStart = useCallback(
     (e) => {
+      e.preventDefault();
+      if (!context) return;
       const touch = e.touches[0];
       const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect(); // Get the canvas position relative to viewport
+      const rect = canvas.getBoundingClientRect();
       const offsetX = touch.clientX - rect.left;
       const offsetY = touch.clientY - rect.top;
 
@@ -210,30 +263,51 @@ export default function CanvasPreview({
         setPanStart({ x: touch.clientX, y: touch.clientY });
       } else if (activeTool === "Brush" || activeTool === "Eraser") {
         setIsDrawing(true);
-        const point = canvasToWorld(offsetX, offsetY, scale, origin);
-        setLines((prevLines) => [
-          ...prevLines,
-          {
-            tool: activeTool.toLowerCase(),
-            brushSize: brushSizeRef.current,
-            currentColor: currentColorRef.current,
-            points: [point],
-          },
-        ]);
+        const worldPos = canvasToWorld(offsetX, offsetY);
+        const newAction = {
+          type: "line",
+          tool: activeTool.toLowerCase(),
+          brushSize: brushSizeRef.current,
+          currentColor: currentColorRef.current,
+          points: [{ x: worldPos.x, y: worldPos.y }],
+        };
+        setActions((prevActions) => [...prevActions, newAction]);
+
+        // Begin path for immediate drawing
+        context.beginPath();
+        context.moveTo(worldPos.x, worldPos.y);
+        context.lineWidth = brushSizeRef.current;
+        context.strokeStyle =
+          activeTool === "Eraser" ? "rgba(0,0,0,1)" : currentColorRef.current;
+        context.globalCompositeOperation =
+          activeTool === "Eraser" ? "destination-out" : "source-over";
       } else if (activeTool === "Fill") {
-        const fillColor = hexToRgba(currentColorRef.current); // Convertir la couleur actuelle en format RGBA
-        floodFill(offsetX, offsetY, fillColor, context);
+        const worldPos = canvasToWorld(offsetX, offsetY);
+        const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+        const fillColor = hexToRgba(currentColorRef.current);
+
+        // Perform flood fill
+        floodFill(pixelPos.x, pixelPos.y, fillColor, context);
+
+        // Record the fill action
+        const newAction = {
+          type: "fill",
+          x: pixelPos.x,
+          y: pixelPos.y,
+          fillColor: fillColor,
+        };
+        setActions((prevActions) => [...prevActions, newAction]);
       }
     },
-    [scale, origin, activeTool]
+    [activeTool, context]
   );
 
   // Handle panning with mouse
   const handlePan = useCallback(
     (e) => {
       if (!isPanning) return;
-      const dx = (e.clientX - panStart.x) / scale;
-      const dy = (e.clientY - panStart.y) / scale;
+      const dx = (e.clientX - panStart.x) / scaleRef.current;
+      const dy = (e.clientY - panStart.y) / scaleRef.current;
 
       setOrigin((prevOrigin) => ({
         x: prevOrigin.x - dx,
@@ -241,7 +315,7 @@ export default function CanvasPreview({
       }));
       setPanStart({ x: e.clientX, y: e.clientY });
     },
-    [isPanning, panStart, scale]
+    [isPanning, panStart]
   );
 
   // Handle panning with touch
@@ -249,8 +323,8 @@ export default function CanvasPreview({
     (e) => {
       if (!isPanning) return;
       const touch = e.touches[0];
-      const dx = (touch.clientX - panStart.x) / scale;
-      const dy = (touch.clientY - panStart.y) / scale;
+      const dx = (touch.clientX - panStart.x) / scaleRef.current;
+      const dy = (touch.clientY - panStart.y) / scaleRef.current;
 
       setOrigin((prevOrigin) => ({
         x: prevOrigin.x - dx,
@@ -258,66 +332,79 @@ export default function CanvasPreview({
       }));
       setPanStart({ x: touch.clientX, y: touch.clientY });
     },
-    [isPanning, panStart, scale]
+    [isPanning, panStart]
   );
 
+  // Handle mouse move events
   const handleMouseMove = useCallback(
     (e) => {
       if (isDrawing) {
         const { offsetX, offsetY } = e.nativeEvent;
-        const point = canvasToWorld(offsetX, offsetY, scale, origin);
-        setLines((prevLines) => {
-          const newLines = [...prevLines];
-          const currentLine = newLines[newLines.length - 1];
+        const worldPos = canvasToWorld(offsetX, offsetY);
+        const currentAction = actions[actions.length - 1];
+        if (currentAction && currentAction.type === "line") {
+          const lastPoint =
+            currentAction.points[currentAction.points.length - 1];
+          if (distance(lastPoint, worldPos) > 2) {
+            // Update the current action with the new point
+            setActions((prevActions) => {
+              const newActions = [...prevActions];
+              newActions[newActions.length - 1].points.push({
+                x: worldPos.x,
+                y: worldPos.y,
+              });
+              return newActions;
+            });
 
-          // Ajoute seulement le point si la distance est suffisante
-          if (
-            currentLine.points.length === 0 ||
-            distance(currentLine.points[currentLine.points.length - 1], point) >
-              2
-          ) {
-            currentLine.points = [...currentLine.points, point];
+            // Draw the line segment
+            // context.lineTo(worldPos.x, worldPos.y);
+            // context.stroke();
           }
-
-          return newLines;
-        });
+        }
       } else if (isPanning) {
         handlePan(e);
       }
     },
-    [isDrawing, scale, origin, isPanning, handlePan]
+    [isDrawing, actions, context, handlePan]
   );
 
+  // Handle touch move events
   const handleTouchMove = useCallback(
     (e) => {
-      const touch = e.touches[0];
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const offsetX = touch.clientX - rect.left;
-      const offsetY = touch.clientY - rect.top;
-
+      e.preventDefault();
+      if (!context) return;
       if (isDrawing) {
-        const point = canvasToWorld(offsetX, offsetY, scale, origin);
-        setLines((prevLines) => {
-          const newLines = [...prevLines];
-          const currentLine = newLines[newLines.length - 1];
+        const touch = e.touches[0];
+        const canvas = canvasRef.current;
+        const rect = canvas.getBoundingClientRect();
+        const offsetX = touch.clientX - rect.left;
+        const offsetY = touch.clientY - rect.top;
+        const worldPos = canvasToWorld(offsetX, offsetY);
+        const currentAction = actions[actions.length - 1];
+        if (currentAction && currentAction.type === "line") {
+          const lastPoint =
+            currentAction.points[currentAction.points.length - 1];
+          if (distance(lastPoint, worldPos) > 2) {
+            // Update the current action with the new point
+            setActions((prevActions) => {
+              const newActions = [...prevActions];
+              newActions[newActions.length - 1].points.push({
+                x: worldPos.x,
+                y: worldPos.y,
+              });
+              return newActions;
+            });
 
-          // Ajoute seulement le point si la distance est suffisante
-          if (
-            currentLine.points.length === 0 ||
-            distance(currentLine.points[currentLine.points.length - 1], point) >
-              2
-          ) {
-            currentLine.points = [...currentLine.points, point];
+            // Draw the line segment
+            // context.lineTo(worldPos.x, worldPos.y);
+            // context.stroke();
           }
-
-          return newLines;
-        });
+        }
       } else if (isPanning) {
         handleTouchPan(e);
       }
     },
-    [isDrawing, scale, origin, isPanning, handleTouchPan]
+    [isDrawing, actions, context, handleTouchPan]
   );
 
   // Stop drawing or panning for mouse
@@ -333,6 +420,7 @@ export default function CanvasPreview({
     setIsPanning(false);
   }, []);
 
+  // Function to draw smooth lines (not used in this approach but kept for reference)
   const drawSmoothLine = (ctx, points, lineColor) => {
     if (points.length < 2) return;
     ctx.strokeStyle = lineColor;
@@ -351,102 +439,111 @@ export default function CanvasPreview({
     ctx.stroke();
   };
 
-  // Redraw all lines
+  // Redraw all actions
   const redraw = useCallback(() => {
     if (!context) return;
 
+    // Clear the canvas
     context.save();
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     context.restore();
 
+    // Apply current transformations
     context.save();
     context.setTransform(
-      scale,
+      scaleRef.current,
       0,
       0,
-      scale,
-      -origin.x * scale,
-      -origin.y * scale
+      scaleRef.current,
+      -originRef.current.x * scaleRef.current,
+      -originRef.current.y * scaleRef.current
     );
 
-    lines.forEach((line) => {
-      context.beginPath();
+    // Iterate through all actions and apply them
+    actions.forEach((action) => {
+      if (action.type === "line") {
+        if (action.points.length > 0) {
+          context.lineWidth = action.brushSize;
+          context.strokeStyle =
+            action.tool === "eraser" ? "rgba(0,0,0,1)" : action.currentColor;
+          context.globalCompositeOperation =
+            action.tool === "eraser" ? "destination-out" : "source-over";
+          context.beginPath();
+          context.moveTo(action.points[0].x, action.points[0].y);
 
-      if (line.tool === "eraser") {
-        context.globalCompositeOperation = "destination-out";
-        context.lineWidth = 20;
-      } else {
-        context.globalCompositeOperation = "source-over";
-        context.lineWidth = line.brushSize; // Utilise la taille du pinceau stockée
-      }
+          for (let i = 1; i < action.points.length; i++) {
+            context.lineTo(action.points[i].x, action.points[i].y);
+          }
 
-      // Remplace le tracé classique par des courbes lissées
-      if (line.points.length > 1) {
-        drawSmoothLine(context, line.points, line.currentColor); // Fonction de courbe de Bézier
-      } else {
-        // Si une seule ligne, dessiner un point simple
-        const point = line.points[0];
-        context.fillStyle = line.currentColor; // Définir la couleur de remplissage
-        context.beginPath(); // Démarrer un nouveau chemin
-        context.arc(point.x, point.y, line.brushSize / 2, 0, 2 * Math.PI);
-        context.fill();
+          context.stroke();
+        }
+      } else if (action.type === "fill") {
+        // Perform flood fill
+        floodFill(action.x, action.y, action.fillColor, context);
       }
     });
 
-    context.globalCompositeOperation = "source-over";
-
     context.restore();
-  }, [context, lines, scale, origin]);
+  }, [actions, context]);
 
   // Handle zoom using keyboard shortcuts
   const zoomFromCenter = useCallback(
     (e) => {
       if (e.ctrlKey) {
+        e.preventDefault(); // Prevent default browser zoom
         const canvas = canvasRef.current;
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
-        const centerWorldPos = canvasToWorld(centerX, centerY, scale, origin);
+        const worldPos = canvasToWorld(centerX, centerY);
+        const pixelPos = worldToPixel(worldPos.x, worldPos.y);
 
-        let newScale = scale;
+        let newScale = scaleRef.current;
         if (e.key === "+") newScale *= 1.1;
         if (e.key === "-") newScale /= 1.1;
 
+        // Limit the scale to a reasonable range
+        newScale = Math.min(Math.max(newScale, 0.1), 5);
+
         const newOrigin = {
-          x: centerWorldPos.x - centerX / newScale,
-          y: centerWorldPos.y - centerY / newScale,
+          x: worldPos.x - centerX / newScale,
+          y: worldPos.y - centerY / newScale,
         };
 
         setScale(newScale);
         setOrigin(newOrigin);
       }
     },
-    [scale, origin]
+    [canvasToWorld, worldToPixel]
   );
 
   // Handle zoom using mouse scroll
   const handleScroll = useCallback(
     (e) => {
       e.preventDefault();
-      const { offsetX, offsetY } = e;
-      const mouseWorldPos = canvasToWorld(offsetX, offsetY, scale, origin);
+      const { offsetX, offsetY, deltaY } = e;
+      const worldPos = canvasToWorld(offsetX, offsetY);
+      const pixelPos = worldToPixel(worldPos.x, worldPos.y);
 
-      let newScale = scale;
-      if (e.deltaY < 0) {
+      let newScale = scaleRef.current;
+      if (deltaY < 0) {
         newScale *= 1.1;
       } else {
         newScale /= 1.1;
       }
 
+      // Limit the scale to a reasonable range
+      newScale = Math.min(Math.max(newScale, 0.1), 5);
+
       const newOrigin = {
-        x: mouseWorldPos.x - offsetX / newScale,
-        y: mouseWorldPos.y - offsetY / newScale,
+        x: worldPos.x - offsetX / newScale,
+        y: worldPos.y - offsetY / newScale,
       };
 
       setScale(newScale);
       setOrigin(newOrigin);
     },
-    [scale, origin]
+    [canvasToWorld, worldToPixel]
   );
 
   // Handle zoom with slider
@@ -456,17 +553,18 @@ export default function CanvasPreview({
       const canvas = canvasRef.current;
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
-      const centerWorldPos = canvasToWorld(centerX, centerY, scale, origin);
+      const worldPos = canvasToWorld(centerX, centerY);
+      const pixelPos = worldToPixel(worldPos.x, worldPos.y);
 
       const newOrigin = {
-        x: centerWorldPos.x - centerX / newScale,
-        y: centerWorldPos.y - centerY / newScale,
+        x: worldPos.x - centerX / newScale,
+        y: worldPos.y - centerY / newScale,
       };
 
       setScale(newScale);
       setOrigin(newOrigin);
     },
-    [scale, origin]
+    [canvasToWorld, worldToPixel]
   );
 
   // Reset zoom to default scale (1)
@@ -474,16 +572,18 @@ export default function CanvasPreview({
     const canvas = canvasRef.current;
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
-    const centerWorldPos = canvasToWorld(centerX, centerY, scale, origin);
+    const worldPos = canvasToWorld(centerX, centerY);
+    const pixelPos = worldToPixel(worldPos.x, worldPos.y);
 
     const newOrigin = {
-      x: centerWorldPos.x - centerX,
-      y: centerWorldPos.y - centerY,
+      x: worldPos.x - centerX,
+      y: worldPos.y - centerY,
     };
     setScale(1);
     setOrigin(newOrigin);
   };
 
+  // Add event listeners for zoom
   useEffect(() => {
     const canvas = canvasRef.current;
     canvas.addEventListener("wheel", handleScroll, { passive: false });
@@ -497,10 +597,12 @@ export default function CanvasPreview({
     return () => window.removeEventListener("keydown", zoomFromCenter);
   }, [zoomFromCenter]);
 
+  // Redraw the canvas whenever actions, scale, or origin change
   useEffect(() => {
     redraw();
-  }, [scale, origin, lines, redraw]);
+  }, [actions, scale, origin, redraw]);
 
+  // Update brush size and color references
   useEffect(() => {
     brushSizeRef.current = brushSize;
   }, [brushSize]);
@@ -524,11 +626,15 @@ export default function CanvasPreview({
         className="overflow-hidden"
         style={{
           cursor:
-            activeTool === "Pan" || isMiddleButtonDown
+            isPanning || isMiddleButtonDown
               ? "move"
               : activeTool === "Eraser"
               ? "pointer"
+              : activeTool === "Fill"
+              ? "crosshair"
               : "crosshair",
+          width: "100%", // Adjust as needed
+          height: "100%", // Adjust as needed
         }}
       />
 
