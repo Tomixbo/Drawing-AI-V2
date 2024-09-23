@@ -15,6 +15,8 @@ export default function App() {
   const [activeTool, setActiveTool] = useState("Brush");
   const [toolBarPosition, setToolBarPosition] = useState("left");
   const [brushSize, setBrushSize] = useState(2);
+  const [currentColor, setCurrentColor] = useState("#000000");
+  const [backgroundColor, setBackgroundColor] = useState("#FFFFFF"); // Initial background color to white
 
   // Appliquer ou retirer la classe "dark" à l'élément <html> quand darkMode change
   useEffect(() => {
@@ -58,6 +60,10 @@ export default function App() {
           setToolBarPosition={setToolBarPosition}
           brushSize={brushSize}
           setBrushSize={setBrushSize}
+          currentColor={currentColor}
+          setCurrentColor={setCurrentColor}
+          backgroundColor={backgroundColor}
+          setBackgroundColor={setBackgroundColor}
         />
 
         <CanvasPreview
@@ -65,6 +71,7 @@ export default function App() {
           activeTool={activeTool}
           toolBarPosition={toolBarPosition}
           brushSize={brushSize}
+          currentColor={currentColor}
         />
       </div>
     </div>

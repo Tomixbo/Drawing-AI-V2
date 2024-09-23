@@ -8,6 +8,7 @@ export default function CanvasPreview({
   activeTool, // "Brush", "Pan", "Eraser"
   toolBarPosition,
   brushSize,
+  currentColor,
 }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -19,8 +20,123 @@ export default function CanvasPreview({
   const [origin, setOrigin] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const brushSizeRef = useRef(brushSize);
+  const currentColorRef = useRef(currentColor);
   const distance = (p1, p2) => {
     return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+  };
+
+  const hexToRgba = (hex) => {
+    const bigint = parseInt(hex.slice(1), 16);
+    return [
+      (bigint >> 16) & 255, // Red
+      (bigint >> 8) & 255, // Green
+      bigint & 255, // Blue
+      255, // Alpha
+    ];
+  };
+
+  const colorMatch = (target, current, tolerance = 30) => {
+    return (
+      Math.abs(target[0] - current[0]) <= tolerance && // Red
+      Math.abs(target[1] - current[1]) <= tolerance && // Green
+      Math.abs(target[2] - current[2]) <= tolerance && // Blue
+      Math.abs(target[3] - current[3]) <= tolerance // Alpha
+    );
+  };
+
+  const floodFill = (startX, startY, fillColor, ctx) => {
+    const canvas = ctx.canvas;
+    const width = canvas.width;
+    const height = canvas.height;
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const data = imgData.data;
+
+    const stack = [[startX, startY]];
+    const targetColor = [
+      data[(startY * width + startX) * 4], // Red
+      data[(startY * width + startX) * 4 + 1], // Green
+      data[(startY * width + startX) * 4 + 2], // Blue
+      data[(startY * width + startX) * 4 + 3], // Alpha
+    ];
+
+    const isSameColor = (pixelPos) => {
+      const currentColor = [
+        data[pixelPos], // Red
+        data[pixelPos + 1], // Green
+        data[pixelPos + 2], // Blue
+        data[pixelPos + 3], // Alpha
+      ];
+
+      const match = colorMatch(targetColor, currentColor);
+      console.log(
+        `Checking pixel at position: ${
+          pixelPos / 4
+        }, match: ${match}, currentColor:`,
+        currentColor
+      );
+      return match;
+    };
+
+    const setPixelColor = (pixelPos) => {
+      data[pixelPos] = fillColor[0]; // Red
+      data[pixelPos + 1] = fillColor[1]; // Green
+      data[pixelPos + 2] = fillColor[2]; // Blue
+      data[pixelPos + 3] = fillColor[3]; // Alpha
+      console.log(
+        `Filling pixel at position: ${pixelPos} with color:`,
+        fillColor
+      );
+    };
+
+    while (stack.length) {
+      let [px, py] = stack.pop();
+      let pixelPos = (py * width + px) * 4;
+
+      // Move to the left until a different color
+      while (px >= 0 && isSameColor(pixelPos)) {
+        px--;
+        pixelPos = (py * width + px) * 4;
+      }
+      px++;
+
+      let reachLeft = false;
+      let reachRight = false;
+
+      // Fill the new line
+      while (px < width && isSameColor(pixelPos)) {
+        setPixelColor(pixelPos);
+
+        if (py > 0) {
+          if (isSameColor(pixelPos - width * 4)) {
+            if (!reachLeft) {
+              console.log(`Adding pixel to stack: [${px}, ${py - 1}]`);
+              stack.push([px, py - 1]);
+              reachLeft = true;
+            }
+          } else {
+            reachLeft = false;
+          }
+        }
+
+        if (py < height - 1) {
+          if (isSameColor(pixelPos + width * 4)) {
+            if (!reachRight) {
+              console.log(`Adding pixel to stack: [${px}, ${py + 1}]`);
+              stack.push([px, py + 1]);
+              reachRight = true;
+            }
+          } else {
+            reachRight = false;
+          }
+        }
+
+        px++;
+        pixelPos = (py * width + px) * 4;
+      }
+    }
+
+    console.log("Fill complete");
+    ctx.putImageData(imgData, 0, 0); // Apply the changes
   };
 
   // Clear the canvas
@@ -61,10 +177,16 @@ export default function CanvasPreview({
           {
             tool: activeTool.toLowerCase(),
             brushSize: brushSizeRef.current,
+            currentColor: currentColorRef.current,
             points: [point],
           }, // Store tool type
         ]);
+      } else if (activeTool === "Fill" && e.button === 0) {
+        const { offsetX, offsetY } = e.nativeEvent;
+        const fillColor = hexToRgba(currentColorRef.current); // Convertir la couleur actuelle en format RGBA
+        floodFill(offsetX, offsetY, fillColor, context);
       }
+
       if (e.button === 1) {
         setIsMiddleButtonDown(true);
         setIsPanning(true);
@@ -94,9 +216,13 @@ export default function CanvasPreview({
           {
             tool: activeTool.toLowerCase(),
             brushSize: brushSizeRef.current,
+            currentColor: currentColorRef.current,
             points: [point],
           },
         ]);
+      } else if (activeTool === "Fill") {
+        const fillColor = hexToRgba(currentColorRef.current); // Convertir la couleur actuelle en format RGBA
+        floodFill(offsetX, offsetY, fillColor, context);
       }
     },
     [scale, origin, activeTool]
@@ -207,9 +333,9 @@ export default function CanvasPreview({
     setIsPanning(false);
   }, []);
 
-  const drawSmoothLine = (ctx, points) => {
+  const drawSmoothLine = (ctx, points, lineColor) => {
     if (points.length < 2) return;
-
+    ctx.strokeStyle = lineColor;
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
 
@@ -257,16 +383,19 @@ export default function CanvasPreview({
 
       // Remplace le tracé classique par des courbes lissées
       if (line.points.length > 1) {
-        drawSmoothLine(context, line.points); // Fonction de courbe de Bézier
+        drawSmoothLine(context, line.points, line.currentColor); // Fonction de courbe de Bézier
       } else {
         // Si une seule ligne, dessiner un point simple
         const point = line.points[0];
+        context.fillStyle = line.currentColor; // Définir la couleur de remplissage
+        context.beginPath(); // Démarrer un nouveau chemin
         context.arc(point.x, point.y, line.brushSize / 2, 0, 2 * Math.PI);
         context.fill();
       }
     });
 
     context.globalCompositeOperation = "source-over";
+
     context.restore();
   }, [context, lines, scale, origin]);
 
@@ -375,6 +504,10 @@ export default function CanvasPreview({
   useEffect(() => {
     brushSizeRef.current = brushSize;
   }, [brushSize]);
+
+  useEffect(() => {
+    currentColorRef.current = currentColor;
+  }, [currentColor]);
 
   return (
     <>

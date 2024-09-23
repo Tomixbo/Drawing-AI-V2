@@ -18,6 +18,10 @@ export default function ToolBar({
   setToolBarPosition,
   brushSize,
   setBrushSize,
+  currentColor,
+  setCurrentColor,
+  backgroundColor,
+  setBackgroundColor,
 }) {
   const isDragging = useRef(false);
   const [isTransparent, setIsTransparent] = useState(false);
@@ -278,7 +282,14 @@ export default function ToolBar({
             brushSize={brushSize}
             setBrushSize={setBrushSize}
           />
-          <ColorSelect iconSize={toolSize} toolBarPosition={toolBarPosition} />
+          <ColorSelect
+            iconSize={toolSize}
+            toolBarPosition={toolBarPosition}
+            currentColor={currentColor}
+            setCurrentColor={setCurrentColor}
+            backgroundColor={backgroundColor}
+            setBackgroundColor={setBackgroundColor}
+          />
         </div>
       </div>
       {isDragging.current ? <MenuZones navBarHeight={navBarHeight} /> : null}

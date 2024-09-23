@@ -3,9 +3,14 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import React, { useState } from "react";
 import "./style/colorSelect.css";
 
-export default function ColorSelect({ toolBarPosition, iconSize }) {
-  const [currentColor, setCurrentColor] = useState("#000000");
-  const [backgroundColor, setBackgroundColor] = useState("#FFFFFF"); // Initial background color to white
+export default function ColorSelect({
+  toolBarPosition,
+  iconSize,
+  currentColor,
+  setCurrentColor,
+  backgroundColor,
+  setBackgroundColor,
+}) {
   // Function to handle color change
   const handleColor = (e) => {
     setCurrentColor(e.currentTarget.value);
