@@ -22,6 +22,7 @@ export default function ToolBar({
   setCurrentColor,
   backgroundColor,
   setBackgroundColor,
+  canvasRef,
 }) {
   const isDragging = useRef(false);
   const [isTransparent, setIsTransparent] = useState(false);
@@ -146,6 +147,33 @@ export default function ToolBar({
   // Function to activate the fill tool
   const handleFill = () => {
     setActiveTool("Fill");
+  };
+
+  // Function to activate the fill tool
+  const handleFillImage = () => {
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d");
+
+    // Récupérer les données d'image du canvas
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+    // Créer un nouveau canvas pour y remettre les données
+    const newCanvas = document.createElement("canvas");
+    newCanvas.width = canvas.width;
+    newCanvas.height = canvas.height;
+    const newContext = newCanvas.getContext("2d");
+
+    // Réinjecter les données dans le nouveau canvas
+    newContext.putImageData(imageData, 0, 0);
+
+    // Sauvegarder le nouveau canvas en PNG
+    const dataURL = newCanvas.toDataURL("image/png");
+
+    // Créer un lien de téléchargement pour l'image
+    const downloadLink = document.createElement("a");
+    downloadLink.href = dataURL;
+    downloadLink.download = "canvas_image.png";
+    downloadLink.click();
   };
 
   useEffect(() => {
@@ -277,6 +305,7 @@ export default function ToolBar({
             nameTool={"Fill Image"}
             iconSize={toolSize}
             toolBarPosition={toolBarPosition}
+            handleFunction={handleFillImage}
             activeTool={activeTool}
             navBarHeight={navBarHeight}
             brushSize={brushSize}
