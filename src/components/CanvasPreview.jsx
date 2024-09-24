@@ -9,8 +9,8 @@ export default function CanvasPreview({
   toolBarPosition,
   brushSize,
   currentColor,
+  canvasRef,
 }) {
-  const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [isMiddleButtonDown, setIsMiddleButtonDown] = useState(false);
@@ -220,18 +220,23 @@ export default function CanvasPreview({
         //   activeTool === "Eraser" ? "destination-out" : "source-over";
       } else if (activeTool === "Fill" && e.button === 0) {
         const { offsetX, offsetY } = e.nativeEvent;
-        const worldPos = canvasToWorld(offsetX, offsetY);
-        const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+
+        // Convert screen coordinates to world coordinates
+        const worldPos = canvasToWorld(offsetX, offsetY); // World coordinates
+
+        // Convert world coordinates to pixel coordinates based on zoom and pan
+        const pixelPos = worldToPixel(worldPos.x, worldPos.y); // Pixel coordinates
+
         const fillColor = hexToRgba(currentColorRef.current);
 
-        // Perform flood fill
+        // Perform flood fill using pixel coordinates (for actual filling)
         floodFill(pixelPos.x, pixelPos.y, fillColor, context);
 
-        // Record the fill action
+        // Record the fill action using world coordinates (for correct redraw)
         const newAction = {
           type: "fill",
-          x: pixelPos.x,
-          y: pixelPos.y,
+          x: worldPos.x, // Store world coordinates for later redraw
+          y: worldPos.y,
           fillColor: fillColor,
         };
         setActions((prevActions) => [...prevActions, newAction]);
@@ -445,11 +450,11 @@ export default function CanvasPreview({
 
     // Clear the canvas
     context.save();
-    context.setTransform(1, 0, 0, 1, 0, 0);
-    context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    context.setTransform(1, 0, 0, 1, 0, 0); // Reset transformations
+    context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height); // Clear canvas
     context.restore();
 
-    // Apply current transformations
+    // Apply current transformations (zoom and pan)
     context.save();
     context.setTransform(
       scaleRef.current,
@@ -479,8 +484,24 @@ export default function CanvasPreview({
           context.stroke();
         }
       } else if (action.type === "fill") {
-        // Perform flood fill
-        floodFill(action.x, action.y, action.fillColor, context);
+        // Convert the fill coordinates (world coordinates) to pixel coordinates
+        const adjustedX = Math.floor(
+          (action.x - originRef.current.x) * scaleRef.current
+        );
+        const adjustedY = Math.floor(
+          (action.y - originRef.current.y) * scaleRef.current
+        );
+
+        // Ensure the adjusted coordinates are within the bounds of the canvas
+        if (
+          adjustedX >= 0 &&
+          adjustedX < canvasRef.current.width &&
+          adjustedY >= 0 &&
+          adjustedY < canvasRef.current.height
+        ) {
+          // Perform flood fill using the adjusted coordinates
+          floodFill(adjustedX, adjustedY, action.fillColor, context);
+        }
       }
     });
 
