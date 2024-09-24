@@ -1,6 +1,14 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrashCan } from "@fortawesome/free-solid-svg-icons";
+import {
+  faTrashCan,
+  faReply,
+  faShare,
+  faXmark,
+  faMagnifyingGlass,
+  faMagnifyingGlassPlus,
+  faMagnifyingGlassMinus,
+} from "@fortawesome/free-solid-svg-icons";
 import "./style/canvasStyle.css";
 
 export default function CanvasPreview({
@@ -17,6 +25,7 @@ export default function CanvasPreview({
   const [context, setContext] = useState(null);
   const [scale, setScale] = useState(1); // Zoom scale
   const [actions, setActions] = useState([]); // Each action is { type: 'line' | 'fill', ... }
+  const [redoStack, setRedoStack] = useState([]); // Stack to store redo actions
   const [origin, setOrigin] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const brushSizeRef = useRef(brushSize);
@@ -31,10 +40,9 @@ export default function CanvasPreview({
 
   // Redraw all actions
   const redraw = useCallback(() => {
-    console.log("redraw");
     if (!context) return;
 
-    // Clear the canvas
+    // Clear the canvas before redrawing
     context.save();
     context.setTransform(1, 0, 0, 1, 0, 0); // Reset transformations
     context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height); // Clear canvas
@@ -51,9 +59,23 @@ export default function CanvasPreview({
       -originRef.current.y * scaleRef.current
     );
 
+    // Flag to track if the canvas was cleared
+    let cleared = false;
+
     // Iterate through all actions and apply them
     actions.forEach((action) => {
-      if (action.type === "line") {
+      if (action.type === "clear") {
+        // Clear the canvas if a clear action is found
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(
+          0,
+          0,
+          canvasRef.current.width,
+          canvasRef.current.height
+        );
+        cleared = true;
+      } else if (action.type === "line" && !cleared) {
+        // Draw lines only if the canvas wasn't cleared
         if (action.points.length > 0) {
           context.lineWidth = action.brushSize;
           context.strokeStyle =
@@ -69,8 +91,8 @@ export default function CanvasPreview({
 
           context.stroke();
         }
-      } else if (action.type === "fill") {
-        // Convert the fill coordinates (world coordinates) to pixel coordinates
+      } else if (action.type === "fill" && !cleared) {
+        // Draw fill actions only if the canvas wasn't cleared
         const adjustedX = Math.floor(
           (action.x - originRef.current.x) * scaleRef.current
         );
@@ -236,8 +258,17 @@ export default function CanvasPreview({
 
   // Clear the canvas and reset actions
   const clearCanvas = useCallback(() => {
-    setActions([]); // Reset actions
     if (context) {
+      // Store the current state of the canvas before clearing it as an action
+      const clearAction = {
+        type: "clear",
+      };
+      setActions((prevActions) => {
+        setRedoStack([]); // Clear the redo stack when a new action is added
+        return [...prevActions, clearAction];
+      });
+
+      // Actually clear the canvas
       context.save();
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.clearRect(
@@ -273,7 +304,10 @@ export default function CanvasPreview({
           currentColor: currentColorRef.current,
           points: [{ x: worldPos.x, y: worldPos.y }],
         };
-        setActions((prevActions) => [...prevActions, newAction]);
+        setActions((prevActions) => {
+          setRedoStack([]); // Clear the redo stack when a new action is added
+          return [...prevActions, newAction];
+        });
 
         // Begin a new path when starting a new drawing
         context.beginPath();
@@ -299,7 +333,10 @@ export default function CanvasPreview({
           y: worldPos.y,
           fillColor,
         };
-        setActions((prevActions) => [...prevActions, newAction]);
+        setActions((prevActions) => {
+          setRedoStack([]); // Clear the redo stack when a new action is added
+          return [...prevActions, newAction];
+        });
       }
 
       if (e.button === 1) {
@@ -337,7 +374,10 @@ export default function CanvasPreview({
           currentColor: currentColorRef.current,
           points: [{ x: worldPos.x, y: worldPos.y }],
         };
-        setActions((prevActions) => [...prevActions, newAction]);
+        setActions((prevActions) => {
+          setRedoStack([]); // Clear the redo stack when a new action is added
+          return [...prevActions, newAction];
+        });
 
         // Begin path for immediate drawing on touch start
         context.beginPath();
@@ -357,7 +397,10 @@ export default function CanvasPreview({
           y: worldPos.y,
           fillColor,
         };
-        setActions((prevActions) => [...prevActions, newAction]);
+        setActions((prevActions) => {
+          setRedoStack([]); // Clear the redo stack when a new action is added
+          return [...prevActions, newAction];
+        });
       }
     },
     [activeTool, context, canvasToWorld, worldToPixel]
@@ -409,6 +452,7 @@ export default function CanvasPreview({
                 x: worldPos.x,
                 y: worldPos.y,
               });
+              setRedoStack([]); // Clear the redo stack when a new action is added
               return newActions;
             });
 
@@ -461,6 +505,7 @@ export default function CanvasPreview({
               x: worldPos.x,
               y: worldPos.y,
             });
+            setRedoStack([]); // Clear the redo stack when a new action is added
             return newActions;
           });
 
@@ -587,7 +632,7 @@ export default function CanvasPreview({
       }
 
       // Limit the scale to a reasonable range
-      newScale = Math.min(Math.max(newScale, 0.1), 5);
+      newScale = Math.min(Math.max(newScale, 1), 5);
 
       const newOrigin = {
         x: worldPos.x - offsetX / newScale,
@@ -637,6 +682,41 @@ export default function CanvasPreview({
     setOrigin(newOrigin);
   };
 
+  // zoom +
+  const handleResetZoomPlus = () => {
+    const canvas = canvasRef.current;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const worldPos = canvasToWorld(centerX, centerY);
+    const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+    const newScale = scale < 5 ? scale + 0.1 : scale;
+
+    const newOrigin = {
+      x: worldPos.x - centerX / newScale,
+      y: worldPos.y - centerY / newScale,
+    };
+    setScale(newScale);
+    setOrigin(newOrigin);
+  };
+
+  // zoom -
+  const handleResetZoomMinus = () => {
+    const canvas = canvasRef.current;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const worldPos = canvasToWorld(centerX, centerY);
+    const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+
+    const newScale = scale > 1 ? scale - 0.1 : scale;
+
+    const newOrigin = {
+      x: worldPos.x - centerX / newScale,
+      y: worldPos.y - centerY / newScale,
+    };
+    setScale(newScale);
+    setOrigin(newOrigin);
+  };
+
   // Add event listeners for zoom
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -672,6 +752,24 @@ export default function CanvasPreview({
     currentColorRef.current = currentColor;
   }, [currentColor]);
 
+  const undo = () => {
+    if (actions.length > 0) {
+      const lastAction = actions.pop(); // Remove the last action
+      setRedoStack((prev) => [lastAction, ...prev]); // Add it to redoStack
+      setActions([...actions]); // Update the actions state
+      redraw(); // Redraw the canvas
+    }
+  };
+
+  const redo = () => {
+    if (redoStack.length > 0) {
+      const redoAction = redoStack.shift(); // Get the last undone action
+      setActions((prev) => [...prev, redoAction]); // Add it back to actions
+      setRedoStack([...redoStack]); // Update the redoStack state
+      redraw(); // Redraw the canvas
+    }
+  };
+
   return (
     <>
       <canvas
@@ -700,22 +798,37 @@ export default function CanvasPreview({
       />
 
       <div
-        className={`fixed flex items-center right-1/2 transform translate-x-1/2 md:right-8 md:translate-x-0`}
+        className={`fixed flex items-center right-1/2 transform translate-x-1/2 md:right-8 md:translate-x-0 bg-white bg-opacity-90 px-2 `}
         style={{
           top: toolBarPosition === "bottom" ? `${32 + navBarHeight}px` : null,
           bottom: toolBarPosition === "bottom" ? null : "32px",
         }}
       >
+        {/* Undo Button */}
+        <button
+          onClick={undo} // Call the undo function
+          className="mr-3 text-grey-300 hover:text-cyan-600"
+        >
+          <FontAwesomeIcon icon={faReply} />
+        </button>
+
+        {/* Redo Button */}
+        <button
+          onClick={redo} // Call the redo function
+          className="mr-3 text-grey-300 hover:text-cyan-600"
+        >
+          <FontAwesomeIcon icon={faShare} />
+        </button>
         <button
           onClick={clearCanvas}
-          className="mr-2 text-grey-300 hover:text-cyan-600"
+          className="mr-3 text-grey-300 hover:text-cyan-600"
         >
           <FontAwesomeIcon icon={faTrashCan} />
         </button>
         <span className="mr-2">{scale.toFixed(1)}x</span>
         <input
           type="range"
-          min="0.1"
+          min="1"
           max="5"
           step="0.1"
           value={scale}
@@ -724,9 +837,22 @@ export default function CanvasPreview({
         />
         <button
           onClick={handleResetZoom}
-          className="ml-2 bg-none text-grey-300 hover:text-cyan-600 hover:underline"
+          className="ml-3 text-grey-300 hover:text-cyan-600"
         >
-          Reset Zoom
+          <FontAwesomeIcon icon={faXmark} />
+        </button>
+
+        <button
+          onClick={handleResetZoomMinus}
+          className="ml-3 text-grey-300 hover:text-cyan-600"
+        >
+          <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
+        </button>
+        <button
+          onClick={handleResetZoomPlus}
+          className="ml-3 text-grey-300 hover:text-cyan-600"
+        >
+          <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
         </button>
       </div>
     </>
