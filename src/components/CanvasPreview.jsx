@@ -5,7 +5,6 @@ import {
   faReply,
   faShare,
   faXmark,
-  faMagnifyingGlass,
   faMagnifyingGlassPlus,
   faMagnifyingGlassMinus,
 } from "@fortawesome/free-solid-svg-icons";
@@ -32,6 +31,7 @@ export default function CanvasPreview({
   const currentColorRef = useRef(currentColor);
   const scaleRef = useRef(scale);
   const originRef = useRef(origin);
+  const rectSize = { width: 512, height: 512 };
 
   useEffect(() => {
     scaleRef.current = scale;
@@ -287,7 +287,10 @@ export default function CanvasPreview({
       e.preventDefault();
       if (!context) return;
 
-      if (activeTool === "Pan" && e.button === 0) {
+      if (
+        activeTool === "Pan" ||
+        (activeTool === "FillImage" && e.button === 0)
+      ) {
         setIsPanning(true);
         setPanStart({ x: e.clientX, y: e.clientY });
       } else if (
@@ -362,7 +365,7 @@ export default function CanvasPreview({
 
       const worldPos = canvasToWorld(offsetX, offsetY);
 
-      if (activeTool === "Pan") {
+      if (activeTool === "Pan" || activeTool === "FillImage") {
         setIsPanning(true);
         setPanStart({ x: touch.clientX, y: touch.clientY });
       } else if (activeTool === "Brush" || activeTool === "Eraser") {
@@ -785,15 +788,15 @@ export default function CanvasPreview({
         className="overflow-hidden"
         style={{
           cursor:
-            isPanning || isMiddleButtonDown
+            isPanning || isMiddleButtonDown || activeTool === "FillImage"
               ? "move"
               : activeTool === "Eraser"
               ? "pointer"
               : activeTool === "Fill"
               ? "crosshair"
               : "crosshair",
-          width: "100%", // Adjust as needed
-          height: "100%", // Adjust as needed
+          width: "100%",
+          height: "100%",
         }}
       />
 
@@ -855,6 +858,31 @@ export default function CanvasPreview({
           <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
         </button>
       </div>
+      {activeTool === "FillImage" && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0, // Démarre en dessous de la navbar
+            left: 0,
+            width: "100%",
+            height: `100%`, // Ajuste la hauteur en conséquence
+            pointerEvents: "none",
+            zIndex: 10, // Assurez-vous que c'est au-dessus du canvas mais en dessous de la navbar
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              width: "512px",
+              height: "512px",
+              transform: "translate(-50%, -50%)",
+              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.7)", // Ajoute de la transparence
+            }}
+          />
+        </div>
+      )}
     </>
   );
 }

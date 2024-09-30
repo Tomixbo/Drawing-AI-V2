@@ -5,7 +5,7 @@ import {
   faEraser,
   faPaintBrush,
   faFillDrip,
-  faImage,
+  faEye,
   faArrowsUpDownLeftRight,
 } from "@fortawesome/free-solid-svg-icons";
 import ColorSelect from "./ColorSelect";
@@ -150,30 +150,33 @@ export default function ToolBar({
   };
 
   // Function to activate the fill tool
+  // const handleFillImage = () => {
+  //   const canvas = canvasRef.current;
+  //   const context = canvas.getContext("2d");
+
+  //   // Récupérer les données d'image du canvas
+  //   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+  //   // Créer un nouveau canvas pour y remettre les données
+  //   const newCanvas = document.createElement("canvas");
+  //   newCanvas.width = canvas.width;
+  //   newCanvas.height = canvas.height;
+  //   const newContext = newCanvas.getContext("2d");
+
+  //   // Réinjecter les données dans le nouveau canvas
+  //   newContext.putImageData(imageData, 0, 0);
+
+  //   // Sauvegarder le nouveau canvas en PNG
+  //   const dataURL = newCanvas.toDataURL("image/png");
+
+  //   // Créer un lien de téléchargement pour l'image
+  //   const downloadLink = document.createElement("a");
+  //   downloadLink.href = dataURL;
+  //   downloadLink.download = "canvas_image.png";
+  //   downloadLink.click();
+  // };
   const handleFillImage = () => {
-    const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
-
-    // Récupérer les données d'image du canvas
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-
-    // Créer un nouveau canvas pour y remettre les données
-    const newCanvas = document.createElement("canvas");
-    newCanvas.width = canvas.width;
-    newCanvas.height = canvas.height;
-    const newContext = newCanvas.getContext("2d");
-
-    // Réinjecter les données dans le nouveau canvas
-    newContext.putImageData(imageData, 0, 0);
-
-    // Sauvegarder le nouveau canvas en PNG
-    const dataURL = newCanvas.toDataURL("image/png");
-
-    // Créer un lien de téléchargement pour l'image
-    const downloadLink = document.createElement("a");
-    downloadLink.href = dataURL;
-    downloadLink.download = "canvas_image.png";
-    downloadLink.click();
+    setActiveTool("FillImage"); // Change l'outil actif
   };
 
   useEffect(() => {
@@ -301,8 +304,8 @@ export default function ToolBar({
             setBrushSize={setBrushSize}
           />
           <Tool
-            iconTool={faImage}
-            nameTool={"Fill Image"}
+            iconTool={faEye}
+            nameTool={"FillImage"}
             iconSize={toolSize}
             toolBarPosition={toolBarPosition}
             handleFunction={handleFillImage}
@@ -310,6 +313,7 @@ export default function ToolBar({
             navBarHeight={navBarHeight}
             brushSize={brushSize}
             setBrushSize={setBrushSize}
+            toolStyle={"important"}
           />
           <ColorSelect
             iconSize={toolSize}
