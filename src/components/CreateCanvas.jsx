@@ -54,6 +54,25 @@ export default function CreateCanvas({
     originRef.current = origin;
   }, [scale, origin]);
 
+  // Function to draw smooth lines (not used in this approach but kept for reference)
+  const drawSmoothLine = (ctx, points, lineColor) => {
+    if (points.length < 2) return;
+    ctx.strokeStyle = lineColor;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+
+    for (let i = 1; i < points.length - 1; i++) {
+      const midPoint = {
+        x: (points[i].x + points[i + 1].x) / 2,
+        y: (points[i].y + points[i + 1].y) / 2,
+      };
+      ctx.quadraticCurveTo(points[i].x, points[i].y, midPoint.x, midPoint.y);
+    }
+
+    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+    ctx.stroke();
+  };
+
   // Redraw all actions
   const redraw = useCallback(() => {
     if (!context) return;
@@ -97,10 +116,23 @@ export default function CreateCanvas({
           context.beginPath();
           context.moveTo(action.points[0].x, action.points[0].y);
 
-          for (let i = 1; i < action.points.length; i++) {
-            context.lineTo(action.points[i].x, action.points[i].y);
+          for (let i = 1; i < action.points.length - 1; i++) {
+            // context.lineTo(action.points[i].x, action.points[i].y);
+            const midPoint = {
+              x: (action.points[i].x + action.points[i + 1].x) / 2,
+              y: (action.points[i].y + action.points[i + 1].y) / 2,
+            };
+            context.quadraticCurveTo(
+              action.points[i].x,
+              action.points[i].y,
+              midPoint.x,
+              midPoint.y
+            );
           }
-
+          context.lineTo(
+            action.points[action.points.length - 1].x,
+            action.points[action.points.length - 1].y
+          );
           context.stroke();
         }
       } else if (action.type === "fill") {
@@ -581,25 +613,6 @@ export default function CreateCanvas({
     // Redraw the canvas after the touch ends
     redraw();
   }, [redraw]);
-
-  // Function to draw smooth lines (not used in this approach but kept for reference)
-  const drawSmoothLine = (ctx, points, lineColor) => {
-    if (points.length < 2) return;
-    ctx.strokeStyle = lineColor;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-
-    for (let i = 1; i < points.length - 1; i++) {
-      const midPoint = {
-        x: (points[i].x + points[i + 1].x) / 2,
-        y: (points[i].y + points[i + 1].y) / 2,
-      };
-      ctx.quadraticCurveTo(points[i].x, points[i].y, midPoint.x, midPoint.y);
-    }
-
-    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
-    ctx.stroke();
-  };
 
   // Handle zoom using keyboard shortcuts
   const zoomFromCenter = useCallback(
