@@ -12,7 +12,7 @@ import "./style/canvasStyle.css";
 
 export default function CanvasPreview({
   navBarHeight,
-  activeTool, // "Brush", "Pan", "Eraser", "Fill"
+  activeTool, // "Brush", "Pan", "Eraser", "Fill", "FillImage"
   toolBarPosition,
   brushSize,
   currentColor,
@@ -31,7 +31,23 @@ export default function CanvasPreview({
   const currentColorRef = useRef(currentColor);
   const scaleRef = useRef(scale);
   const originRef = useRef(origin);
-  const rectSize = { width: 512, height: 512 };
+
+  // State variables for resizing the FocusArea
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeEdge, setResizeEdge] = useState(null); // "left", "right", "top", "bottom"
+  const [hoverEdge, setHoverEdge] = useState(null); // For hover effect
+  const [startResizeMousePosition, setStartResizeMousePosition] = useState({
+    x: 0,
+    y: 0,
+  });
+  const [startWindowSize, setStartWindowSize] = useState({
+    width: 512,
+    height: 512,
+  });
+  const [windowSize, setWindowSize] = useState({
+    width: 512,
+    height: 512,
+  });
 
   useEffect(() => {
     scaleRef.current = scale;
@@ -59,23 +75,19 @@ export default function CanvasPreview({
       -originRef.current.y * scaleRef.current
     );
 
-    // Flag to track if the canvas was cleared
-    let cleared = false;
+    // Find the index of the last 'clear' action
+    const lastClearIndex = actions.reduce((lastIndex, action, index) => {
+      if (action.type === "clear") return index;
+      return lastIndex;
+    }, -1);
 
-    // Iterate through all actions and apply them
-    actions.forEach((action) => {
-      if (action.type === "clear") {
-        // Clear the canvas if a clear action is found
-        context.setTransform(1, 0, 0, 1, 0, 0);
-        context.clearRect(
-          0,
-          0,
-          canvasRef.current.width,
-          canvasRef.current.height
-        );
-        cleared = true;
-      } else if (action.type === "line" && !cleared) {
-        // Draw lines only if the canvas wasn't cleared
+    // Get the actions after the last 'clear' action
+    const actionsToProcess = actions.slice(lastClearIndex + 1);
+
+    // Iterate through actionsToProcess and apply them
+    actionsToProcess.forEach((action) => {
+      if (action.type === "line") {
+        // Draw lines
         if (action.points.length > 0) {
           context.lineWidth = action.brushSize;
           context.strokeStyle =
@@ -91,8 +103,8 @@ export default function CanvasPreview({
 
           context.stroke();
         }
-      } else if (action.type === "fill" && !cleared) {
-        // Draw fill actions only if the canvas wasn't cleared
+      } else if (action.type === "fill") {
+        // Draw fill actions
         const adjustedX = Math.floor(
           (action.x - originRef.current.x) * scaleRef.current
         );
@@ -623,9 +635,13 @@ export default function CanvasPreview({
   const handleScroll = useCallback(
     (e) => {
       e.preventDefault();
-      const { offsetX, offsetY, deltaY } = e;
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const offsetX = e.clientX - rect.left;
+      const offsetY = e.clientY - rect.top;
+      const deltaY = e.deltaY;
+
       const worldPos = canvasToWorld(offsetX, offsetY);
-      const pixelPos = worldToPixel(worldPos.x, worldPos.y);
 
       let newScale = scaleRef.current;
       if (deltaY < 0) {
@@ -645,7 +661,7 @@ export default function CanvasPreview({
       setScale(newScale);
       setOrigin(newOrigin);
     },
-    [canvasToWorld, worldToPixel]
+    [canvasToWorld]
   );
 
   // Handle zoom with slider
@@ -773,6 +789,280 @@ export default function CanvasPreview({
     }
   };
 
+  const handleFocusAreaMouseMove = useCallback(
+    (e) => {
+      e.preventDefault();
+
+      if (!isResizing) {
+        // **Hovering Logic**
+        const focusArea = e.currentTarget;
+        const rect = focusArea.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const edgeThreshold = 10; // Sensitivity for detecting edges
+
+        let newHoverEdge = null;
+        let cursorStyle = "default";
+
+        if (mouseX >= -edgeThreshold && mouseX <= edgeThreshold) {
+          newHoverEdge = "left";
+          cursorStyle = "ew-resize";
+        } else if (
+          mouseX >= rect.width - edgeThreshold &&
+          mouseX <= rect.width + edgeThreshold
+        ) {
+          newHoverEdge = "right";
+          cursorStyle = "ew-resize";
+        } else if (mouseY >= -edgeThreshold && mouseY <= edgeThreshold) {
+          newHoverEdge = "top";
+          cursorStyle = "ns-resize";
+        } else if (
+          mouseY >= rect.height - edgeThreshold &&
+          mouseY <= rect.height + edgeThreshold
+        ) {
+          newHoverEdge = "bottom";
+          cursorStyle = "ns-resize";
+        } else {
+          newHoverEdge = null;
+          cursorStyle = "move"; // Allow panning inside the focus area
+        }
+
+        setHoverEdge(newHoverEdge);
+        focusArea.style.cursor = cursorStyle;
+      } else {
+        // **Resizing Logic**
+        // Calculate delta based on global mouse position
+        const deltaX = e.clientX - startResizeMousePosition.x;
+        const deltaY = e.clientY - startResizeMousePosition.y;
+
+        if (resizeEdge === "left") {
+          // When resizing left, decrease width if dragging left, increase if dragging right
+          const newWidth = Math.max(50, startWindowSize.width - deltaX);
+          setWindowSize((prev) => ({ ...prev, width: newWidth }));
+        } else if (resizeEdge === "right") {
+          // When resizing right, increase width if dragging right, decrease if dragging left
+          const newWidth = Math.max(50, startWindowSize.width + deltaX);
+          setWindowSize((prev) => ({ ...prev, width: newWidth }));
+        } else if (resizeEdge === "top") {
+          // When resizing top, decrease height if dragging up, increase if dragging down
+          const newHeight = Math.max(50, startWindowSize.height - deltaY);
+          setWindowSize((prev) => ({ ...prev, height: newHeight }));
+        } else if (resizeEdge === "bottom") {
+          // When resizing bottom, increase height if dragging down, decrease if dragging up
+          const newHeight = Math.max(50, startWindowSize.height + deltaY);
+          setWindowSize((prev) => ({ ...prev, height: newHeight }));
+        }
+      }
+    },
+    [isResizing, resizeEdge, startResizeMousePosition, startWindowSize]
+  );
+
+  // Updated handleFocusAreaMouseDown function
+  const handleFocusAreaMouseDown = useCallback(
+    (e) => {
+      e.preventDefault();
+      if (hoverEdge) {
+        setIsResizing(true);
+        setResizeEdge(hoverEdge);
+        setStartResizeMousePosition({ x: e.clientX, y: e.clientY });
+        setStartWindowSize({ ...windowSize });
+      } else {
+        // Begin panning when clicking inside the focus area
+        if (activeTool === "FillImage") {
+          setIsPanning(true);
+          setPanStart({ x: e.clientX, y: e.clientY });
+        }
+      }
+    },
+    [hoverEdge, windowSize, activeTool]
+  );
+
+  // Updated handleFocusAreaMouseUp function
+  const handleFocusAreaMouseUp = useCallback(() => {
+    setIsResizing(false);
+    setResizeEdge(null);
+    setIsPanning(false);
+  }, []);
+
+  // Updated handleFocusAreaMouseLeave function
+  const handleFocusAreaMouseLeave = useCallback(() => {
+    if (!isResizing) {
+      setHoverEdge(null);
+    }
+  }, [isResizing]);
+
+  // Handle panning inside the focus area
+  const handleFocusAreaPan = useCallback(
+    (e) => {
+      if (!isPanning) return;
+
+      const dx = (e.clientX - panStart.x) / scaleRef.current;
+      const dy = (e.clientY - panStart.y) / scaleRef.current;
+
+      setOrigin((prevOrigin) => ({
+        x: prevOrigin.x - dx,
+        y: prevOrigin.y - dy,
+      }));
+
+      setPanStart({ x: e.clientX, y: e.clientY });
+
+      redraw();
+    },
+    [isPanning, panStart, redraw]
+  );
+
+  // Add mouse move listener for panning inside the focus area
+  useEffect(() => {
+    if (isPanning) {
+      window.addEventListener("mousemove", handleFocusAreaPan);
+      window.addEventListener("mouseup", handleFocusAreaMouseUp);
+    } else {
+      window.removeEventListener("mousemove", handleFocusAreaPan);
+      window.removeEventListener("mouseup", handleFocusAreaMouseUp);
+    }
+    return () => {
+      window.removeEventListener("mousemove", handleFocusAreaPan);
+      window.removeEventListener("mouseup", handleFocusAreaMouseUp);
+    };
+  }, [isPanning, handleFocusAreaPan, handleFocusAreaMouseUp]);
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener("mousemove", handleFocusAreaMouseMove);
+      window.addEventListener("mouseup", handleFocusAreaMouseUp);
+    } else {
+      window.removeEventListener("mousemove", handleFocusAreaMouseMove);
+      window.removeEventListener("mouseup", handleFocusAreaMouseUp);
+    }
+    return () => {
+      window.removeEventListener("mousemove", handleFocusAreaMouseMove);
+      window.removeEventListener("mouseup", handleFocusAreaMouseUp);
+    };
+  }, [isResizing, handleFocusAreaMouseMove, handleFocusAreaMouseUp]);
+
+  // Handle touch start on the focus area
+  const handleFocusAreaTouchStart = useCallback(
+    (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      if (hoverEdge) {
+        // Initiate resizing
+        setIsResizing(true);
+        setResizeEdge(hoverEdge);
+        setStartResizeMousePosition({ x: touch.clientX, y: touch.clientY });
+        setStartWindowSize({ ...windowSize });
+      } else {
+        // Initiate panning
+        if (activeTool === "FillImage") {
+          setIsPanning(true);
+          setPanStart({ x: touch.clientX, y: touch.clientY });
+        }
+      }
+    },
+    [hoverEdge, windowSize, activeTool]
+  );
+
+  // Handle touch move on the focus area
+  const handleFocusAreaTouchMove = useCallback(
+    (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      if (isResizing) {
+        // Calculate movement deltas based on global touch positions
+        const deltaX = touch.clientX - startResizeMousePosition.x;
+        const deltaY = touch.clientY - startResizeMousePosition.y;
+
+        if (resizeEdge === "left") {
+          const newWidth = Math.max(50, startWindowSize.width - deltaX);
+          setWindowSize((prev) => ({ ...prev, width: newWidth }));
+        } else if (resizeEdge === "right") {
+          const newWidth = Math.max(50, startWindowSize.width + deltaX);
+          setWindowSize((prev) => ({ ...prev, width: newWidth }));
+        } else if (resizeEdge === "top") {
+          const newHeight = Math.max(50, startWindowSize.height - deltaY);
+          setWindowSize((prev) => ({ ...prev, height: newHeight }));
+        } else if (resizeEdge === "bottom") {
+          const newHeight = Math.max(50, startWindowSize.height + deltaY);
+          setWindowSize((prev) => ({ ...prev, height: newHeight }));
+        }
+      } else if (isPanning) {
+        // Calculate panning deltas
+        const dx = (touch.clientX - panStart.x) / scaleRef.current;
+        const dy = (touch.clientY - panStart.y) / scaleRef.current;
+
+        setOrigin((prevOrigin) => ({
+          x: prevOrigin.x - dx,
+          y: prevOrigin.y - dy,
+        }));
+
+        setPanStart({ x: touch.clientX, y: touch.clientY });
+
+        // Redraw the canvas as we pan
+        redraw();
+      }
+    },
+    [
+      isResizing,
+      resizeEdge,
+      startResizeMousePosition,
+      startWindowSize,
+      isPanning,
+      panStart,
+      scaleRef,
+      redraw,
+    ]
+  );
+
+  // Handle touch end on the focus area
+  const handleFocusAreaTouchEnd = useCallback(() => {
+    setIsResizing(false);
+    setResizeEdge(null);
+    setIsPanning(false);
+  }, []);
+
+  // Manage touch event listeners for panning
+  useEffect(() => {
+    if (isPanning) {
+      window.addEventListener("touchmove", handleFocusAreaTouchMove, {
+        passive: false,
+      });
+      window.addEventListener("touchend", handleFocusAreaTouchEnd);
+    } else {
+      window.removeEventListener("touchmove", handleFocusAreaTouchMove, {
+        passive: false,
+      });
+      window.removeEventListener("touchend", handleFocusAreaTouchEnd);
+    }
+    return () => {
+      window.removeEventListener("touchmove", handleFocusAreaTouchMove, {
+        passive: false,
+      });
+      window.removeEventListener("touchend", handleFocusAreaTouchEnd);
+    };
+  }, [isPanning, handleFocusAreaTouchMove, handleFocusAreaTouchEnd]);
+
+  // Manage touch event listeners for resizing
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener("touchmove", handleFocusAreaTouchMove, {
+        passive: false,
+      });
+      window.addEventListener("touchend", handleFocusAreaTouchEnd);
+    } else {
+      window.removeEventListener("touchmove", handleFocusAreaTouchMove, {
+        passive: false,
+      });
+      window.removeEventListener("touchend", handleFocusAreaTouchEnd);
+    }
+    return () => {
+      window.removeEventListener("touchmove", handleFocusAreaTouchMove, {
+        passive: false,
+      });
+      window.removeEventListener("touchend", handleFocusAreaTouchEnd);
+    };
+  }, [isResizing, handleFocusAreaTouchMove, handleFocusAreaTouchEnd]);
+
   return (
     <>
       <canvas
@@ -859,29 +1149,108 @@ export default function CanvasPreview({
         </button>
       </div>
       {activeTool === "FillImage" && (
-        <div
-          style={{
-            position: "absolute",
-            top: 0, // Démarre en dessous de la navbar
-            left: 0,
-            width: "100%",
-            height: `100%`, // Ajuste la hauteur en conséquence
-            pointerEvents: "none",
-            zIndex: 10, // Assurez-vous que c'est au-dessus du canvas mais en dessous de la navbar
-          }}
-        >
+        <>
           <div
             style={{
               position: "absolute",
-              top: "50%",
-              left: "50%",
-              width: "512px",
-              height: "512px",
-              transform: "translate(-50%, -50%)",
-              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.7)", // Ajoute de la transparence
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: `100%`,
+              pointerEvents: "none",
+              zIndex: 10,
+              overflow: "hidden",
             }}
-          />
-        </div>
+          >
+            <div
+              onMouseMove={handleFocusAreaMouseMove}
+              onMouseDown={handleFocusAreaMouseDown}
+              onMouseUp={handleFocusAreaMouseUp}
+              onMouseLeave={handleFocusAreaMouseLeave}
+              onTouchStart={handleFocusAreaTouchStart}
+              onTouchMove={handleFocusAreaTouchMove}
+              onTouchEnd={handleFocusAreaTouchEnd}
+              onWheel={handleScroll}
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                width: `${windowSize.width}px`,
+                height: `${windowSize.height}px`,
+                transform: "translate(-50%, -50%)",
+                boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.7)",
+                border: "2px solid transparent",
+                borderLeft:
+                  hoverEdge === "left" || hoverEdge === "right"
+                    ? "2px solid cyan"
+                    : undefined,
+                borderRight:
+                  hoverEdge === "left" || hoverEdge === "right"
+                    ? "2px solid cyan"
+                    : undefined,
+                borderTop:
+                  hoverEdge === "top" || hoverEdge === "bottom"
+                    ? "2px solid cyan"
+                    : undefined,
+                borderBottom:
+                  hoverEdge === "top" || hoverEdge === "bottom"
+                    ? "2px solid cyan"
+                    : undefined,
+                cursor:
+                  hoverEdge === "left" || hoverEdge === "right"
+                    ? "ew-resize"
+                    : hoverEdge === "top" || hoverEdge === "bottom"
+                    ? "ns-resize"
+                    : "default",
+                pointerEvents: "auto",
+              }}
+            />
+          </div>
+
+          {/* Input box for width and height adjustment */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 20,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 11,
+              backgroundColor: "#fff",
+              padding: "10px",
+              borderRadius: "8px",
+              boxShadow: "0 0 5px rgba(0, 0, 0, 0.2)",
+            }}
+          >
+            <label>
+              Width:
+              <input
+                type="number"
+                value={windowSize.width}
+                onChange={(e) =>
+                  setWindowSize((prev) => ({
+                    ...prev,
+                    width: Number(e.target.value),
+                  }))
+                }
+                style={{ marginRight: "10px", padding: "5px", width: "80px" }}
+              />
+            </label>
+            <label>
+              Height:
+              <input
+                type="number"
+                value={windowSize.height}
+                onChange={(e) =>
+                  setWindowSize((prev) => ({
+                    ...prev,
+                    height: Number(e.target.value),
+                  }))
+                }
+                style={{ padding: "5px", width: "80px" }}
+              />
+            </label>
+          </div>
+        </>
       )}
     </>
   );
