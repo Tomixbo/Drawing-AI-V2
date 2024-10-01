@@ -10,22 +10,30 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import "./style/canvasStyle.css";
 
-export default function CanvasPreview({
+export default function CreateCanvas({
   navBarHeight,
   activeTool, // "Brush", "Pan", "Eraser", "Fill", "FillImage"
   toolBarPosition,
   brushSize,
   currentColor,
   canvasRef,
+  actions,
+  setActions,
+  windowSize,
+  setWindowSize,
+  startWindowSize,
+  setStartWindowSize,
+  scale,
+  setScale,
+  origin,
+  setOrigin,
 }) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [isMiddleButtonDown, setIsMiddleButtonDown] = useState(false);
   const [context, setContext] = useState(null);
-  const [scale, setScale] = useState(1); // Zoom scale
-  const [actions, setActions] = useState([]); // Each action is { type: 'line' | 'fill', ... }
+
   const [redoStack, setRedoStack] = useState([]); // Stack to store redo actions
-  const [origin, setOrigin] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const brushSizeRef = useRef(brushSize);
   const currentColorRef = useRef(currentColor);
@@ -39,14 +47,6 @@ export default function CanvasPreview({
   const [startResizeMousePosition, setStartResizeMousePosition] = useState({
     x: 0,
     y: 0,
-  });
-  const [startWindowSize, setStartWindowSize] = useState({
-    width: 512,
-    height: 512,
-  });
-  const [windowSize, setWindowSize] = useState({
-    width: 512,
-    height: 512,
   });
 
   useEffect(() => {
