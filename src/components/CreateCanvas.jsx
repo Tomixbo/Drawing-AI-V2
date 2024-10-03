@@ -203,6 +203,7 @@ export default function CreateCanvas({
   };
 
   // Flood Fill Algorithm
+  // Optimized floodFill using Scanline Flood Fill and Uint32Array for faster color comparisons
   const floodFill = (startX, startY, fillColor, ctx) => {
     const canvas = ctx.canvas;
     const width = canvas.width;
@@ -210,87 +211,77 @@ export default function CreateCanvas({
     const imgData = ctx.getImageData(0, 0, width, height);
     const data = imgData.data;
 
-    const stack = [[startX, startY]];
-    const targetPos = (startY * width + startX) * 4;
-    const targetColor = [
-      data[targetPos], // Red
-      data[targetPos + 1], // Green
-      data[targetPos + 2], // Blue
-      data[targetPos + 3], // Alpha
-    ];
+    // Create a Uint32Array for faster pixel access and manipulation
+    const data32 = new Uint32Array(data.buffer);
 
-    if (colorMatch(targetColor, fillColor)) {
-      return; // Prevent infinite loop if target color is same as fill color
+    // Helper function to get the color of a pixel as a single integer
+    const getColor = (x, y) => data32[y * width + x];
+
+    // Convert fillColor and targetColor to a single 32-bit integer
+    const fillColor32 =
+      (fillColor[3] << 24) |
+      (fillColor[2] << 16) |
+      (fillColor[1] << 8) |
+      fillColor[0];
+    const targetColor32 = getColor(startX, startY);
+
+    // If the target color is the same as fill color, no need to proceed
+    if (targetColor32 === fillColor32) {
+      return;
     }
 
-    const isSameColor = (pixelPos) => {
-      const currentColor = [
-        data[pixelPos], // Red
-        data[pixelPos + 1], // Green
-        data[pixelPos + 2], // Blue
-        data[pixelPos + 3], // Alpha
-      ];
-      return colorMatch(targetColor, currentColor);
-    };
+    const stack = [];
+    stack.push([startX, startY]);
 
-    const setPixelColor = (pixelPos) => {
-      data[pixelPos] = fillColor[0]; // Red
-      data[pixelPos + 1] = fillColor[1]; // Green
-      data[pixelPos + 2] = fillColor[2]; // Blue
-      data[pixelPos + 3] = fillColor[3]; // Alpha
-    };
+    while (stack.length > 0) {
+      const [x, y] = stack.pop();
 
-    while (stack.length) {
-      const [px, py] = stack.pop();
-      let currentX = px;
-      let currentY = py;
-      let pixelPos = (currentY * width + currentX) * 4;
+      let currentX = x;
 
-      // Move to the leftmost pixel that matches the target color
-      while (currentX >= 0 && isSameColor(pixelPos)) {
+      // Move to the leftmost pixel in the current scanline that matches the target color
+      while (currentX >= 0 && getColor(currentX, y) === targetColor32) {
         currentX--;
-        pixelPos = (currentY * width + currentX) * 4;
       }
       currentX++;
-      pixelPos = (currentY * width + currentX) * 4;
 
-      let reachLeft = false;
-      let reachRight = false;
+      let reachAbove = false;
+      let reachBelow = false;
 
-      // Move to the right, fill pixels and check adjacent pixels
-      while (currentX < width && isSameColor(pixelPos)) {
-        setPixelColor(pixelPos);
+      // Fill the scanline and check pixels above and below
+      while (currentX < width && getColor(currentX, y) === targetColor32) {
+        // Set the current pixel to the fill color
+        data32[y * width + currentX] = fillColor32;
 
-        // Check pixel above
-        if (currentY > 0) {
-          if (isSameColor(pixelPos - width * 4)) {
-            if (!reachLeft) {
-              stack.push([currentX, currentY - 1]);
-              reachLeft = true;
+        // Check the pixel above
+        if (y > 0) {
+          if (getColor(currentX, y - 1) === targetColor32) {
+            if (!reachAbove) {
+              stack.push([currentX, y - 1]);
+              reachAbove = true;
             }
           } else {
-            reachLeft = false;
+            reachAbove = false;
           }
         }
 
-        // Check pixel below
-        if (currentY < height - 1) {
-          if (isSameColor(pixelPos + width * 4)) {
-            if (!reachRight) {
-              stack.push([currentX, currentY + 1]);
-              reachRight = true;
+        // Check the pixel below
+        if (y < height - 1) {
+          if (getColor(currentX, y + 1) === targetColor32) {
+            if (!reachBelow) {
+              stack.push([currentX, y + 1]);
+              reachBelow = true;
             }
           } else {
-            reachRight = false;
+            reachBelow = false;
           }
         }
 
         currentX++;
-        pixelPos = (currentY * width + currentX) * 4;
       }
     }
 
-    ctx.putImageData(imgData, 0, 0); // Apply the changes
+    // Update the canvas with the modified image data
+    ctx.putImageData(imgData, 0, 0);
   };
 
   // Initialize the canvas
@@ -597,7 +588,7 @@ export default function CreateCanvas({
       }
 
       // Limit the scale to a reasonable range
-      newScale = Math.min(Math.max(newScale, 1), 5);
+      newScale = Math.min(Math.max(newScale, 0.5), 5);
 
       const newOrigin = {
         x: worldPos.x - offsetX / newScale,
@@ -672,7 +663,7 @@ export default function CreateCanvas({
     const worldPos = canvasToWorld(centerX, centerY);
     const pixelPos = worldToPixel(worldPos.x, worldPos.y);
 
-    const newScale = scale > 1 ? scale - 0.1 : scale;
+    const newScale = scale > 0.5 ? scale - 0.1 : scale;
 
     const newOrigin = {
       x: worldPos.x - centerX / newScale,
@@ -1117,7 +1108,7 @@ export default function CreateCanvas({
         <span className="mr-2">{scale.toFixed(1)}x</span>
         <input
           type="range"
-          min="1"
+          min="0.5"
           max="5"
           step="0.1"
           value={scale}
@@ -1207,7 +1198,7 @@ export default function CreateCanvas({
           <div
             style={{
               position: "absolute",
-              top: `${navBarHeight + 20}px`,
+              top: `${navBarHeight + 32}px`,
               left: "50%",
               transform: "translateX(-50%)",
               zIndex: 11,
@@ -1249,7 +1240,7 @@ export default function CreateCanvas({
           <div
             style={{
               position: "absolute",
-              bottom: "20px",
+              bottom: "32px",
               left: "50%",
               transform: "translateX(-50%)",
               zIndex: 11,
