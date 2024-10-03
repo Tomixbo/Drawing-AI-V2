@@ -28,6 +28,12 @@ export default function CreateCanvas({
   origin,
   setOrigin,
 }) {
+  const pressureIsEnabled = true;
+  const [prevPoint, setPrevPoint] = useState(null);
+  // Add these variables at the top of your component
+  const smoothingBuffer = useRef([]); // Buffer to store recent points
+  const smoothingBufferSize = 3; // Number of points to average
+
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [isMiddleButtonDown, setIsMiddleButtonDown] = useState(false);
@@ -73,7 +79,145 @@ export default function CreateCanvas({
     ctx.stroke();
   };
 
+  const smoothPressure = (prevPressure, currentPressure, alpha = 0.7) => {
+    return prevPressure * (1 - alpha) + currentPressure * alpha;
+  };
+
+  // Add this function outside of your component or within it, as appropriate
+  const getSmoothedPoints = (points, tension = 0.5, numOfSegments = 16) => {
+    const smoothedPoints = [];
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i - 1] || points[i];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2] || p2;
+
+      for (let t = 0; t <= 1; t += 1 / numOfSegments) {
+        const t2 = t * t;
+        const t3 = t2 * t;
+
+        const x =
+          0.5 *
+          ((-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3 +
+            (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+            (-p0.x + p2.x) * t +
+            2 * p1.x);
+
+        const y =
+          0.5 *
+          ((-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3 +
+            (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+            (-p0.y + p2.y) * t +
+            2 * p1.y);
+
+        const pressure =
+          0.5 *
+          ((-p0.pressure + 3 * p1.pressure - 3 * p2.pressure + p3.pressure) *
+            t3 +
+            (2 * p0.pressure -
+              5 * p1.pressure +
+              4 * p2.pressure -
+              p3.pressure) *
+              t2 +
+            (-p0.pressure + p2.pressure) * t +
+            2 * p1.pressure);
+
+        smoothedPoints.push({ x, y, pressure });
+      }
+    }
+
+    return smoothedPoints;
+  };
+
   // Redraw all actions
+  // const redraw = useCallback(() => {
+  //   if (!context) return;
+
+  //   // Clear the canvas before redrawing
+  //   context.save();
+  //   context.setTransform(1, 0, 0, 1, 0, 0); // Reset transformations
+  //   context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height); // Clear canvas
+  //   context.restore();
+
+  //   // Apply current transformations (zoom and pan)
+  //   context.save();
+  //   context.setTransform(
+  //     scaleRef.current,
+  //     0,
+  //     0,
+  //     scaleRef.current,
+  //     -originRef.current.x * scaleRef.current,
+  //     -originRef.current.y * scaleRef.current
+  //   );
+
+  //   // Find the index of the last 'clear' action
+  //   const lastClearIndex = actions.reduce((lastIndex, action, index) => {
+  //     if (action.type === "clear") return index;
+  //     return lastIndex;
+  //   }, -1);
+
+  //   // Get the actions after the last 'clear' action
+  //   const actionsToProcess = actions.slice(lastClearIndex + 1);
+
+  //   // Iterate through actionsToProcess and apply them
+  //   actionsToProcess.forEach((action) => {
+  //     if (action.type === "line") {
+  //       // Draw lines
+  //       if (action.points.length > 0) {
+  //         context.lineWidth = action.brushSize;
+  //         context.strokeStyle =
+  //           action.tool === "eraser" ? "rgba(0,0,0,1)" : action.currentColor;
+  //         context.globalCompositeOperation =
+  //           action.tool === "eraser" ? "destination-out" : "source-over";
+  //         context.beginPath();
+  //         context.moveTo(action.points[0].x, action.points[0].y);
+
+  //         for (let i = 1; i < action.points.length - 1; i++) {
+  //           // context.lineTo(action.points[i].x, action.points[i].y);
+  //           const midPoint = {
+  //             x: (action.points[i].x + action.points[i + 1].x) / 2,
+  //             y: (action.points[i].y + action.points[i + 1].y) / 2,
+  //           };
+  //           context.quadraticCurveTo(
+  //             action.points[i].x,
+  //             action.points[i].y,
+  //             midPoint.x,
+  //             midPoint.y
+  //           );
+  //         }
+  //         context.lineTo(
+  //           action.points[action.points.length - 1].x,
+  //           action.points[action.points.length - 1].y
+  //         );
+  //         context.stroke();
+  //       }
+  //     } else if (action.type === "fill") {
+  //       // Draw fill actions
+  //       const adjustedX = Math.floor(
+  //         (action.x - originRef.current.x) * scaleRef.current
+  //       );
+  //       const adjustedY = Math.floor(
+  //         (action.y - originRef.current.y) * scaleRef.current
+  //       );
+
+  //       // Ensure the adjusted coordinates are within the bounds of the canvas
+  //       if (
+  //         adjustedX >= 0 &&
+  //         adjustedX < canvasRef.current.width &&
+  //         adjustedY >= 0 &&
+  //         adjustedY < canvasRef.current.height
+  //       ) {
+  //         // Perform flood fill using adjusted coordinates
+  //         floodFill(adjustedX, adjustedY, action.fillColor, context);
+  //       }
+  //     }
+  //   });
+
+  //   context.restore();
+  // }, [actions, context]);
+
+  // ne Redraw function with pressure
   const redraw = useCallback(() => {
     if (!context) return;
 
@@ -106,37 +250,62 @@ export default function CreateCanvas({
     // Iterate through actionsToProcess and apply them
     actionsToProcess.forEach((action) => {
       if (action.type === "line") {
-        // Draw lines
         if (action.points.length > 0) {
-          context.lineWidth = action.brushSize;
           context.strokeStyle =
             action.tool === "eraser" ? "rgba(0,0,0,1)" : action.currentColor;
           context.globalCompositeOperation =
             action.tool === "eraser" ? "destination-out" : "source-over";
-          context.beginPath();
-          context.moveTo(action.points[0].x, action.points[0].y);
 
-          for (let i = 1; i < action.points.length - 1; i++) {
-            // context.lineTo(action.points[i].x, action.points[i].y);
-            const midPoint = {
-              x: (action.points[i].x + action.points[i + 1].x) / 2,
-              y: (action.points[i].y + action.points[i + 1].y) / 2,
-            };
-            context.quadraticCurveTo(
-              action.points[i].x,
-              action.points[i].y,
-              midPoint.x,
-              midPoint.y
+          if (action.usePressure) {
+            // Draw with variable line width
+            for (let i = 0; i < action.points.length - 1; i++) {
+              const p0 = action.points[i];
+              const p1 = action.points[i + 1];
+
+              // Smooth the pressure data
+              // const smoothedPressure = (p0.pressure + p1.pressure) / 2;
+              const smoothedPressure = smoothPressure(
+                p0.pressure,
+                p1.pressure,
+                0.7
+              );
+
+              // Calculate line width based on smoothed pressure
+              let adjustedBrushSize = action.brushSize * smoothedPressure;
+
+              context.beginPath();
+              context.lineWidth = adjustedBrushSize;
+              context.moveTo(p0.x, p0.y);
+              context.lineTo(p1.x, p1.y);
+              context.stroke();
+            }
+          } else {
+            // Draw normally
+            context.lineWidth = action.brushSize;
+            context.beginPath();
+            context.moveTo(action.points[0].x, action.points[0].y);
+
+            for (let i = 1; i < action.points.length - 1; i++) {
+              const midPoint = {
+                x: (action.points[i].x + action.points[i + 1].x) / 2,
+                y: (action.points[i].y + action.points[i + 1].y) / 2,
+              };
+              context.quadraticCurveTo(
+                action.points[i].x,
+                action.points[i].y,
+                midPoint.x,
+                midPoint.y
+              );
+            }
+            context.lineTo(
+              action.points[action.points.length - 1].x,
+              action.points[action.points.length - 1].y
             );
+            context.stroke();
           }
-          context.lineTo(
-            action.points[action.points.length - 1].x,
-            action.points[action.points.length - 1].y
-          );
-          context.stroke();
         }
       } else if (action.type === "fill") {
-        // Draw fill actions
+        //Draw fill actions
         const adjustedX = Math.floor(
           (action.x - originRef.current.x) * scaleRef.current
         );
@@ -326,7 +495,299 @@ export default function CreateCanvas({
   }, [context]);
 
   // Handle mouse down events
-  const handleMouseDown = useCallback(
+  // const handleMouseDown = useCallback(
+  //   (e) => {
+  //     e.preventDefault();
+  //     if (!context) return;
+
+  //     if (
+  //       activeTool === "Pan" ||
+  //       (activeTool === "FillImage" && e.button === 0)
+  //     ) {
+  //       setIsPanning(true);
+  //       setPanStart({ x: e.clientX, y: e.clientY });
+  //     } else if (
+  //       (activeTool === "Brush" || activeTool === "Eraser") &&
+  //       e.button === 0
+  //     ) {
+  //       setIsDrawing(true);
+  //       const { offsetX, offsetY } = e.nativeEvent;
+  //       const worldPos = canvasToWorld(offsetX, offsetY);
+  //       const newAction = {
+  //         type: "line",
+  //         tool: activeTool.toLowerCase(),
+  //         brushSize: brushSizeRef.current,
+  //         currentColor: currentColorRef.current,
+  //         points: [{ x: worldPos.x, y: worldPos.y }],
+  //       };
+  //       setActions((prevActions) => {
+  //         setRedoStack([]); // Clear the redo stack when a new action is added
+  //         return [...prevActions, newAction];
+  //       });
+
+  //       // Begin a new path when starting a new drawing
+  //       context.beginPath();
+  //       const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+  //       context.moveTo(pixelPos.x, pixelPos.y); // Start the path at the first point
+  //     } else if (activeTool === "Fill" && e.button === 0) {
+  //       const { offsetX, offsetY } = e.nativeEvent;
+
+  //       // Convert screen coordinates to world coordinates
+  //       const worldPos = canvasToWorld(offsetX, offsetY);
+
+  //       // Convert world coordinates to pixel coordinates
+  //       const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+
+  //       // Perform flood fill using pixel coordinates
+  //       const fillColor = hexToRgba(currentColorRef.current);
+  //       floodFill(pixelPos.x, pixelPos.y, fillColor, context);
+
+  //       // Record the fill action using world coordinates (for correct redraw)
+  //       const newAction = {
+  //         type: "fill",
+  //         x: worldPos.x, // Store world coordinates for later redraw
+  //         y: worldPos.y,
+  //         fillColor,
+  //       };
+  //       setActions((prevActions) => {
+  //         setRedoStack([]); // Clear the redo stack when a new action is added
+  //         return [...prevActions, newAction];
+  //       });
+  //     }
+
+  //     if (e.button === 1) {
+  //       // Middle button for panning
+  //       setIsMiddleButtonDown(true);
+  //       setIsPanning(true);
+  //       setPanStart({ x: e.clientX, y: e.clientY });
+  //     }
+  //   },
+  //   [activeTool, context]
+  // );
+
+  // Handle touch start events
+  // const handleTouchStart = useCallback(
+  //   (e) => {
+  //     e.preventDefault();
+  //     if (!context) return;
+  //     const touch = e.touches[0];
+  //     const canvas = canvasRef.current;
+  //     const rect = canvas.getBoundingClientRect();
+  //     const offsetX = touch.clientX - rect.left;
+  //     const offsetY = touch.clientY - rect.top;
+
+  //     const worldPos = canvasToWorld(offsetX, offsetY);
+
+  //     if (activeTool === "Pan" || activeTool === "FillImage") {
+  //       setIsPanning(true);
+  //       setPanStart({ x: touch.clientX, y: touch.clientY });
+  //     } else if (activeTool === "Brush" || activeTool === "Eraser") {
+  //       setIsDrawing(true);
+  //       const newAction = {
+  //         type: "line",
+  //         tool: activeTool.toLowerCase(),
+  //         brushSize: brushSizeRef.current,
+  //         currentColor: currentColorRef.current,
+  //         points: [{ x: worldPos.x, y: worldPos.y }],
+  //       };
+  //       setActions((prevActions) => {
+  //         setRedoStack([]); // Clear the redo stack when a new action is added
+  //         return [...prevActions, newAction];
+  //       });
+
+  //       // Begin path for immediate drawing on touch start
+  //       context.beginPath();
+  //       const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+  //       context.moveTo(pixelPos.x, pixelPos.y);
+  //     } else if (activeTool === "Fill") {
+  //       const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+  //       const fillColor = hexToRgba(currentColorRef.current);
+
+  //       // Perform flood fill on touch start
+  //       floodFill(pixelPos.x, pixelPos.y, fillColor, context);
+
+  //       // Record the fill action using world coordinates (for correct redraw)
+  //       const newAction = {
+  //         type: "fill",
+  //         x: worldPos.x, // Store world coordinates for later redraw
+  //         y: worldPos.y,
+  //         fillColor,
+  //       };
+  //       setActions((prevActions) => {
+  //         setRedoStack([]); // Clear the redo stack when a new action is added
+  //         return [...prevActions, newAction];
+  //       });
+  //     }
+  //   },
+  //   [activeTool, context, canvasToWorld, worldToPixel]
+  // );
+
+  // Handle panning with mouse
+  const handlePan = useCallback(
+    (e) => {
+      if (!isPanning) return;
+
+      const dx = (e.clientX - panStart.x) / scaleRef.current;
+      const dy = (e.clientY - panStart.y) / scaleRef.current;
+
+      setOrigin((prevOrigin) => ({
+        x: prevOrigin.x - dx,
+        y: prevOrigin.y - dy,
+      }));
+
+      // Update panStart to the new mouse position
+      setPanStart({ x: e.clientX, y: e.clientY });
+
+      // Redraw the canvas as we pan
+      redraw();
+    },
+    [isPanning, panStart, redraw]
+  );
+
+  // Handle mouse move events
+  // const handleMouseMove = useCallback(
+  //   (e) => {
+  //     if (isDrawing) {
+  //       const { offsetX, offsetY } = e.nativeEvent;
+
+  //       // Convert mouse coordinates to world coordinates (taking into account zoom and pan)
+  //       const worldPos = canvasToWorld(offsetX, offsetY);
+
+  //       const currentAction = actions[actions.length - 1];
+
+  //       if (currentAction && currentAction.type === "line") {
+  //         const lastPoint =
+  //           currentAction.points[currentAction.points.length - 1];
+
+  //         // Only add new points if the cursor has moved sufficiently
+  //         if (distance(lastPoint, worldPos) > 2) {
+  //           // Update the current action with the new point
+  //           setActions((prevActions) => {
+  //             const newActions = [...prevActions];
+  //             newActions[newActions.length - 1].points.push({
+  //               x: worldPos.x,
+  //               y: worldPos.y,
+  //             });
+  //             setRedoStack([]); // Clear the redo stack when a new action is added
+  //             return newActions;
+  //           });
+
+  //           // Draw in real-time, converting world coordinates to pixel coordinates
+  //           const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+
+  //           // Set brush size relative to the current scale (zoom)
+  //           const adjustedBrushSize = brushSizeRef.current * scaleRef.current;
+  //           // Set the brush color based on the current tool (brush or eraser)
+  //           context.strokeStyle =
+  //             activeTool === "Eraser"
+  //               ? "rgba(255,255,255,1)" // Eraser uses opaque/white color
+  //               : currentColorRef.current; // Brush uses the current color
+  //           // Draw the line segment in real-time on the canvas
+  //           context.lineWidth = adjustedBrushSize; // Use the adjusted brush size
+  //           context.lineTo(pixelPos.x, pixelPos.y); // Use pixel coordinates
+  //           context.stroke();
+  //         }
+  //       }
+  //     } else if (isPanning) {
+  //       // Handle panning (move the canvas)
+  //       handlePan(e);
+  //     }
+  //   },
+  //   [isDrawing, actions, handlePan, context]
+  // );
+
+  // Handle touch move events
+  // const handleTouchMove = useCallback(
+  //   (e) => {
+  //     e.preventDefault();
+  //     if (!context) return;
+  //     const touch = e.touches[0];
+  //     const canvas = canvasRef.current;
+  //     const rect = canvas.getBoundingClientRect();
+  //     const offsetX = touch.clientX - rect.left;
+  //     const offsetY = touch.clientY - rect.top;
+
+  //     const worldPos = canvasToWorld(offsetX, offsetY);
+  //     const currentAction = actions[actions.length - 1];
+
+  //     if (isDrawing && currentAction && currentAction.type === "line") {
+  //       const lastPoint = currentAction.points[currentAction.points.length - 1];
+
+  //       if (distance(lastPoint, worldPos) > 2) {
+  //         // Update the current action with the new point
+  //         setActions((prevActions) => {
+  //           const newActions = [...prevActions];
+  //           newActions[newActions.length - 1].points.push({
+  //             x: worldPos.x,
+  //             y: worldPos.y,
+  //           });
+  //           setRedoStack([]); // Clear the redo stack when a new action is added
+  //           return newActions;
+  //         });
+
+  //         // Draw in real-time, converting world coordinates to pixel coordinates
+  //         const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+  //         const adjustedBrushSize = brushSizeRef.current * scaleRef.current;
+
+  //         context.lineWidth = adjustedBrushSize;
+  //         context.strokeStyle =
+  //           activeTool === "Eraser"
+  //             ? "rgba(255,255,255,1)" // Eraser uses opaque/white color
+  //             : currentColorRef.current; // Brush uses the current color
+  //         context.lineTo(pixelPos.x, pixelPos.y);
+  //         context.stroke();
+  //       }
+  //     } else if (isPanning) {
+  //       // Handle panning on touch move
+  //       const dx = (touch.clientX - panStart.x) / scaleRef.current;
+  //       const dy = (touch.clientY - panStart.y) / scaleRef.current;
+
+  //       setOrigin((prevOrigin) => ({
+  //         x: prevOrigin.x - dx,
+  //         y: prevOrigin.y - dy,
+  //       }));
+  //       setPanStart({ x: touch.clientX, y: touch.clientY });
+
+  //       // Redraw the canvas as we pan
+  //       redraw();
+  //     }
+  //   },
+  //   [
+  //     isDrawing,
+  //     isPanning,
+  //     actions,
+  //     context,
+  //     canvasToWorld,
+  //     worldToPixel,
+  //     handlePan,
+  //     redraw,
+  //   ]
+  // );
+
+  // Stop drawing or panning for mouse
+  // const handleMouseUp = useCallback(() => {
+  //   setIsDrawing(false);
+  //   setIsPanning(false);
+  //   setIsMiddleButtonDown(false);
+
+  //   // Redraw only once after the mouse is released
+  //   redraw();
+  // }, [redraw]);
+
+  // Stop drawing or panning for touch
+  // const handleTouchEnd = useCallback(() => {
+  //   setIsDrawing(false);
+  //   setIsPanning(false);
+
+  //   // Redraw the canvas after the touch ends
+  //   redraw();
+  // }, [redraw]);
+
+  // using pointer now to handle pressure
+  // Remove handleMouseDown, handleTouchStart, handleMouseMove, handleTouchMove, handleMouseUp, handleTouchEnd
+
+  // Add handlePointerDown
+  const handlePointerDown = useCallback(
     (e) => {
       e.preventDefault();
       if (!context) return;
@@ -342,14 +803,33 @@ export default function CreateCanvas({
         e.button === 0
       ) {
         setIsDrawing(true);
+
         const { offsetX, offsetY } = e.nativeEvent;
         const worldPos = canvasToWorld(offsetX, offsetY);
+        setPrevPoint({
+          x: worldPos.x,
+          y: worldPos.y,
+          pressure:
+            pressureIsEnabled && typeof e.pressure === "number"
+              ? e.pressure
+              : 1, // Default pressure to 1 if not available
+        });
         const newAction = {
           type: "line",
           tool: activeTool.toLowerCase(),
           brushSize: brushSizeRef.current,
           currentColor: currentColorRef.current,
-          points: [{ x: worldPos.x, y: worldPos.y }],
+          usePressure: pressureIsEnabled && typeof e.pressure === "number", // Add this line
+          points: [
+            {
+              x: worldPos.x,
+              y: worldPos.y,
+              pressure:
+                pressureIsEnabled && typeof e.pressure === "number"
+                  ? e.pressure
+                  : null, // Add this line
+            },
+          ],
         };
         setActions((prevActions) => {
           setRedoStack([]); // Clear the redo stack when a new action is added
@@ -396,93 +876,42 @@ export default function CreateCanvas({
     [activeTool, context]
   );
 
-  // Handle touch start events
-  const handleTouchStart = useCallback(
-    (e) => {
-      e.preventDefault();
-      if (!context) return;
-      const touch = e.touches[0];
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const offsetX = touch.clientX - rect.left;
-      const offsetY = touch.clientY - rect.top;
-
-      const worldPos = canvasToWorld(offsetX, offsetY);
-
-      if (activeTool === "Pan" || activeTool === "FillImage") {
-        setIsPanning(true);
-        setPanStart({ x: touch.clientX, y: touch.clientY });
-      } else if (activeTool === "Brush" || activeTool === "Eraser") {
-        setIsDrawing(true);
-        const newAction = {
-          type: "line",
-          tool: activeTool.toLowerCase(),
-          brushSize: brushSizeRef.current,
-          currentColor: currentColorRef.current,
-          points: [{ x: worldPos.x, y: worldPos.y }],
-        };
-        setActions((prevActions) => {
-          setRedoStack([]); // Clear the redo stack when a new action is added
-          return [...prevActions, newAction];
-        });
-
-        // Begin path for immediate drawing on touch start
-        context.beginPath();
-        const pixelPos = worldToPixel(worldPos.x, worldPos.y);
-        context.moveTo(pixelPos.x, pixelPos.y);
-      } else if (activeTool === "Fill") {
-        const pixelPos = worldToPixel(worldPos.x, worldPos.y);
-        const fillColor = hexToRgba(currentColorRef.current);
-
-        // Perform flood fill on touch start
-        floodFill(pixelPos.x, pixelPos.y, fillColor, context);
-
-        // Record the fill action using world coordinates (for correct redraw)
-        const newAction = {
-          type: "fill",
-          x: worldPos.x, // Store world coordinates for later redraw
-          y: worldPos.y,
-          fillColor,
-        };
-        setActions((prevActions) => {
-          setRedoStack([]); // Clear the redo stack when a new action is added
-          return [...prevActions, newAction];
-        });
-      }
-    },
-    [activeTool, context, canvasToWorld, worldToPixel]
-  );
-
-  // Handle panning with mouse
-  const handlePan = useCallback(
-    (e) => {
-      if (!isPanning) return;
-
-      const dx = (e.clientX - panStart.x) / scaleRef.current;
-      const dy = (e.clientY - panStart.y) / scaleRef.current;
-
-      setOrigin((prevOrigin) => ({
-        x: prevOrigin.x - dx,
-        y: prevOrigin.y - dy,
-      }));
-
-      // Update panStart to the new mouse position
-      setPanStart({ x: e.clientX, y: e.clientY });
-
-      // Redraw the canvas as we pan
-      redraw();
-    },
-    [isPanning, panStart, redraw]
-  );
-
-  // Handle mouse move events
-  const handleMouseMove = useCallback(
+  // Add handlePointerMove
+  const handlePointerMove = useCallback(
     (e) => {
       if (isDrawing) {
         const { offsetX, offsetY } = e.nativeEvent;
-
-        // Convert mouse coordinates to world coordinates (taking into account zoom and pan)
         const worldPos = canvasToWorld(offsetX, offsetY);
+
+        // Get the current pressure
+        let currentPressure =
+          pressureIsEnabled && typeof e.pressure === "number" ? e.pressure : 1; // Default pressure to 1 if not available
+
+        // Smooth the pressure data using EMA or moving average
+        const smoothedPressure = (prevPoint.pressure + currentPressure) / 2;
+
+        // Add the new point to the smoothing buffer
+        smoothingBuffer.current.push({
+          x: worldPos.x,
+          y: worldPos.y,
+          pressure: smoothedPressure,
+        });
+
+        // Keep the buffer size within the limit
+        if (smoothingBuffer.current.length > smoothingBufferSize) {
+          smoothingBuffer.current.shift();
+        }
+
+        // Calculate the average position
+        const avgPoint = smoothingBuffer.current.reduce(
+          (acc, point) => ({
+            x: acc.x + point.x / smoothingBuffer.current.length,
+            y: acc.y + point.y / smoothingBuffer.current.length,
+            pressure:
+              acc.pressure + point.pressure / smoothingBuffer.current.length,
+          }),
+          { x: 0, y: 0, pressure: 0 }
+        );
 
         const currentAction = actions[actions.length - 1];
 
@@ -491,126 +920,53 @@ export default function CreateCanvas({
             currentAction.points[currentAction.points.length - 1];
 
           // Only add new points if the cursor has moved sufficiently
-          if (distance(lastPoint, worldPos) > 2) {
+          if (distance(lastPoint, avgPoint) > 2) {
             // Update the current action with the new point
             setActions((prevActions) => {
               const newActions = [...prevActions];
-              newActions[newActions.length - 1].points.push({
-                x: worldPos.x,
-                y: worldPos.y,
-              });
+              newActions[newActions.length - 1].points.push(avgPoint);
               setRedoStack([]); // Clear the redo stack when a new action is added
               return newActions;
             });
 
-            // Draw in real-time, converting world coordinates to pixel coordinates
-            const pixelPos = worldToPixel(worldPos.x, worldPos.y);
+            // Draw in real-time
+            const prevPixelPos = worldToPixel(prevPoint.x, prevPoint.y);
+            const pixelPos = worldToPixel(avgPoint.x, avgPoint.y);
 
-            // Set brush size relative to the current scale (zoom)
-            const adjustedBrushSize = brushSizeRef.current * scaleRef.current;
-            // Set the brush color based on the current tool (brush or eraser)
+            let adjustedBrushSize =
+              brushSizeRef.current * scaleRef.current * avgPoint.pressure;
+
             context.strokeStyle =
               activeTool === "Eraser"
-                ? "rgba(255,255,255,1)" // Eraser uses opaque/white color
-                : currentColorRef.current; // Brush uses the current color
-            // Draw the line segment in real-time on the canvas
-            context.lineWidth = adjustedBrushSize; // Use the adjusted brush size
-            context.lineTo(pixelPos.x, pixelPos.y); // Use pixel coordinates
+                ? "rgba(255,255,255,1)"
+                : currentColorRef.current;
+
+            context.beginPath();
+            context.lineWidth = adjustedBrushSize;
+            context.moveTo(prevPixelPos.x, prevPixelPos.y);
+            context.lineTo(pixelPos.x, pixelPos.y);
             context.stroke();
+
+            // Update the previous point
+            setPrevPoint(avgPoint);
           }
         }
       } else if (isPanning) {
-        // Handle panning (move the canvas)
         handlePan(e);
       }
     },
-    [isDrawing, actions, handlePan, context]
+    [isDrawing, actions, handlePan, context, prevPoint]
   );
 
-  // Handle touch move events
-  const handleTouchMove = useCallback(
-    (e) => {
-      e.preventDefault();
-      if (!context) return;
-      const touch = e.touches[0];
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      const offsetX = touch.clientX - rect.left;
-      const offsetY = touch.clientY - rect.top;
-
-      const worldPos = canvasToWorld(offsetX, offsetY);
-      const currentAction = actions[actions.length - 1];
-
-      if (isDrawing && currentAction && currentAction.type === "line") {
-        const lastPoint = currentAction.points[currentAction.points.length - 1];
-
-        if (distance(lastPoint, worldPos) > 2) {
-          // Update the current action with the new point
-          setActions((prevActions) => {
-            const newActions = [...prevActions];
-            newActions[newActions.length - 1].points.push({
-              x: worldPos.x,
-              y: worldPos.y,
-            });
-            setRedoStack([]); // Clear the redo stack when a new action is added
-            return newActions;
-          });
-
-          // Draw in real-time, converting world coordinates to pixel coordinates
-          const pixelPos = worldToPixel(worldPos.x, worldPos.y);
-          const adjustedBrushSize = brushSizeRef.current * scaleRef.current;
-
-          context.lineWidth = adjustedBrushSize;
-          context.strokeStyle =
-            activeTool === "Eraser"
-              ? "rgba(255,255,255,1)" // Eraser uses opaque/white color
-              : currentColorRef.current; // Brush uses the current color
-          context.lineTo(pixelPos.x, pixelPos.y);
-          context.stroke();
-        }
-      } else if (isPanning) {
-        // Handle panning on touch move
-        const dx = (touch.clientX - panStart.x) / scaleRef.current;
-        const dy = (touch.clientY - panStart.y) / scaleRef.current;
-
-        setOrigin((prevOrigin) => ({
-          x: prevOrigin.x - dx,
-          y: prevOrigin.y - dy,
-        }));
-        setPanStart({ x: touch.clientX, y: touch.clientY });
-
-        // Redraw the canvas as we pan
-        redraw();
-      }
-    },
-    [
-      isDrawing,
-      isPanning,
-      actions,
-      context,
-      canvasToWorld,
-      worldToPixel,
-      handlePan,
-      redraw,
-    ]
-  );
-
-  // Stop drawing or panning for mouse
-  const handleMouseUp = useCallback(() => {
+  // Add handlePointerUp
+  const handlePointerUp = useCallback(() => {
     setIsDrawing(false);
     setIsPanning(false);
     setIsMiddleButtonDown(false);
+    setPrevPoint(null); // Reset the previous point
+    smoothingBuffer.current = [];
 
-    // Redraw only once after the mouse is released
-    redraw();
-  }, [redraw]);
-
-  // Stop drawing or panning for touch
-  const handleTouchEnd = useCallback(() => {
-    setIsDrawing(false);
-    setIsPanning(false);
-
-    // Redraw the canvas after the touch ends
+    // Redraw only once after the pointer is released
     redraw();
   }, [redraw]);
 
@@ -1136,13 +1492,19 @@ export default function CreateCanvas({
     <>
       <canvas
         ref={canvasRef}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
-        onMouseMove={handleMouseMove}
-        onTouchMove={handleTouchMove}
-        onMouseUp={handleMouseUp}
-        onTouchEnd={handleTouchEnd}
-        onMouseLeave={handleMouseUp}
+        // onMouseDown={handleMouseDown}
+        // onTouchStart={handleTouchStart}
+        // onMouseMove={handleMouseMove}
+        // onTouchMove={handleTouchMove}
+        // onMouseUp={handleMouseUp}
+        // onTouchEnd={handleTouchEnd}
+        // onMouseLeave={handleMouseUp}
+        // onContextMenu={(e) => e.preventDefault()}
+        // className="overflow-hidden"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onMouseLeave={handlePointerUp}
         onContextMenu={(e) => e.preventDefault()}
         className="overflow-hidden"
         style={{
