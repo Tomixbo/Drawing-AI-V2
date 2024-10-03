@@ -721,6 +721,24 @@ export default function CreateCanvas({
     }
   };
 
+  const shortcut_key = useCallback(
+    (e) => {
+      if (e.ctrlKey && e.code === "KeyW" && !e.shiftKey) {
+        undo();
+      }
+
+      if (e.ctrlKey && e.shiftKey && e.code === "KeyW") {
+        redo();
+      }
+    },
+    [setRedoStack, setActions, redraw]
+  );
+
+  useEffect(() => {
+    window.addEventListener("keydown", shortcut_key);
+    return () => window.removeEventListener("keydown", shortcut_key);
+  }, [shortcut_key]);
+
   const handleFocusAreaMouseMove = useCallback(
     (e) => {
       e.preventDefault();
