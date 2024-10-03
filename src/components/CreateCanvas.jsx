@@ -1076,6 +1076,62 @@ export default function CreateCanvas({
     };
   }, [isResizing, handleFocusAreaTouchMove, handleFocusAreaTouchEnd]);
 
+  const handleSaveImage = () => {
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d");
+
+    // Sauvegarder la transformation actuelle
+    context.save();
+
+    // Réinitialiser les transformations pour obtenir les données correctes
+    context.setTransform(1, 0, 0, 1, 0, 0);
+
+    // Calculer les facteurs d'échelle entre la taille du client et la taille du canvas
+    const scaleX = canvas.width / canvas.clientWidth;
+    const scaleY = canvas.height / canvas.clientHeight;
+
+    // Calculer la position de la fenêtre en coordonnées du canvas
+    const windowScreenX = canvas.clientWidth / 2 - windowSize.width / 2;
+    const windowScreenY = canvas.clientHeight / 2 - windowSize.height / 2;
+
+    const windowCanvasX = windowScreenX * scaleX;
+    const windowCanvasY = windowScreenY * scaleY;
+
+    const windowCanvasWidth = windowSize.width * scaleX;
+    const windowCanvasHeight = windowSize.height * scaleY;
+
+    // Obtenir les données de l'image
+    const imageData = context.getImageData(
+      windowCanvasX,
+      windowCanvasY,
+      windowCanvasWidth,
+      windowCanvasHeight
+    );
+
+    // Restaurer les transformations précédentes
+    context.restore();
+
+    // Créer un canvas hors écran
+    const offscreenCanvas = document.createElement("canvas");
+    offscreenCanvas.width = windowCanvasWidth;
+    offscreenCanvas.height = windowCanvasHeight;
+    const offscreenContext = offscreenCanvas.getContext("2d");
+
+    // Placer les données de l'image dans le canvas hors écran
+    offscreenContext.putImageData(imageData, 0, 0);
+
+    // Obtenir l'URL des données de l'image
+    const dataURL = offscreenCanvas.toDataURL("image/png");
+
+    // Créer un lien pour télécharger l'image
+    const link = document.createElement("a");
+    link.href = dataURL;
+    link.download = "image.png";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <>
       <canvas
@@ -1224,7 +1280,7 @@ export default function CreateCanvas({
           <div
             style={{
               position: "absolute",
-              bottom: 20,
+              top: `${navBarHeight + 20}px`,
               left: "50%",
               transform: "translateX(-50%)",
               zIndex: 11,
@@ -1262,6 +1318,21 @@ export default function CreateCanvas({
                 style={{ padding: "5px", width: "80px" }}
               />
             </label>
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              bottom: "20px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 11,
+              backgroundColor: "#fff",
+              padding: "10px",
+              borderRadius: "8px",
+              boxShadow: "0 0 5px rgba(0, 0, 0, 0.2)",
+            }}
+          >
+            <button onClick={handleSaveImage}>Sauvegarder l'image</button>
           </div>
         </>
       )}
